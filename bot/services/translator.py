@@ -62,8 +62,7 @@ class TranslatorService:
         """
         try:
             cleaned = self._clean_for_detection(text)
-            # Messages trop courts -> signal faible, on laisse les fallback décider.
-            if len(cleaned) < 8 or len(cleaned.split()) < 2:
+            if len(cleaned) < 2:
                 return None
 
             langs = detect_langs(cleaned)
@@ -73,15 +72,15 @@ class TranslatorService:
             top = langs[0]
             prob = float(getattr(top, "prob", 0.0) or 0.0)
 
-            # Heuristique de confiance:
-            # - pour les messages courts, exiger une probabilité très élevée
-            # - pour les messages longs, être un peu plus permissif
-            if len(cleaned) < 80:
-                if prob < 0.80:
-                    return None
-            else:
-                if prob < 0.60:
-                    return None
+            # Heuristique de confiance assouplie:
+            # - un mot unique requiert une forte certitude
+            # - phrases courtes requierent certitude moderee
+            if len(cleaned.split()) < 2 and prob < 0.80:
+                return None
+            if len(cleaned) < 30 and prob < 0.65:
+                return None
+            elif prob < 0.50:
+                return None
 
             language = getattr(top, "lang", None)
             if not language or len(language) != 2:

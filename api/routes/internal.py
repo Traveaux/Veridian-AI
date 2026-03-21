@@ -22,6 +22,34 @@ router = APIRouter(prefix="/internal", tags=["internal"])
 from api.security import get_jwt_secret
 from api.security import is_production
 
+SNOWFLAKE_FIELDS = {
+    "id",
+    "support_channel_id",
+    "ticket_category_id",
+    "staff_role_id",
+    "log_channel_id",
+    "welcome_channel_id",
+    "ticket_open_channel_id",
+    "ticket_open_message_id",
+}
+
+
+def _snowflake_to_str(v):
+    if v in (None, ""):
+        return None
+    try:
+        return str(int(v))
+    except Exception:
+        return None
+
+
+def _serialize_guild_config_for_dashboard(guild: dict) -> dict:
+    out = dict(guild or {})
+    for key in SNOWFLAKE_FIELDS:
+        if key in out:
+            out[key] = _snowflake_to_str(out.get(key))
+    return out
+
 
 # ============================================================================
 # Auth middleware
@@ -269,7 +297,7 @@ def get_guild_config(guild_id: int):
     guild = GuildModel.get(guild_id)
     if not guild:
         # Return a sane default config so the dashboard can still render.
-        return {
+        return _serialize_guild_config_for_dashboard({
             "id": guild_id,
             "name": None,
             "tier": "free",
@@ -302,8 +330,8 @@ def get_guild_config(guild_id: int):
             # AI v0.4 defaults
             "ai_custom_prompt": "",
             "ai_prompt_enabled": 0,
-        }
-    return guild
+        })
+    return _serialize_guild_config_for_dashboard(guild)
 
 
 @router.put("/guild/{guild_id}/config", dependencies=[Depends(verify_guild_access)])

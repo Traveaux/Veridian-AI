@@ -13,6 +13,18 @@ from bot.services.translator import TranslatorService
 from bot.services.groq_client import GroqClient
 from bot.config import TICKET_CHANNEL_PREFIX, BOT_OWNER_DISCORD_ID
 
+LANGUAGE_NAMES = {
+    "fr": "Français", "en": "Anglais", "es": "Espagnol", 
+    "de": "Allemand", "it": "Italien", "pt": "Portugais", 
+    "nl": "Néerlandais", "ru": "Russe", "zh": "Chinois", 
+    "ja": "Japonais", "ar": "Arabe", "auto": "Auto"
+}
+
+def get_lang_name(code: str | None) -> str:
+    if not code or code.lower() == "auto":
+        return code if code else "auto"
+    return LANGUAGE_NAMES.get(code.lower(), code.upper())
+
 
 def _safe_int(v):
     try:
@@ -123,7 +135,7 @@ class TicketsCog(commands.Cog):
         def fmt_lang(code: str | None, pending_label: str) -> str:
             if not code or code == "auto":
                 return pending_label
-            return code.upper()
+            return get_lang_name(code)
 
         ul = fmt_lang(user_language, "Détection en cours…")
         sl = fmt_lang(staff_language, "AUTO")
@@ -243,7 +255,7 @@ class TicketsCog(commands.Cog):
                         color=discord.Color.blurple(),
                     )
                     embed.set_author(
-                        name=f"Traduction · {user_lang.upper()} → {staff_lang.upper()} ({'cache' if from_cache else 'api'})"
+                        name=f"Traduction · {get_lang_name(user_lang)} → {get_lang_name(staff_lang)} ({'cache' if from_cache else 'api'})"
                     )
                     await message.channel.send(embed=embed, reference=message, mention_author=False)
                     logger.debug(f"Traduction user->staff envoyee pour ticket {ticket['id']}")
@@ -336,7 +348,7 @@ class TicketsCog(commands.Cog):
                     color=discord.Color.green(),
                 )
                 embed.set_author(
-                    name=f"Traduction · {staff_src_lang.upper()} → {user_lang.upper()} ({'cache' if from_cache else 'api'})"
+                    name=f"Traduction · {get_lang_name(staff_src_lang)} → {get_lang_name(user_lang)} ({'cache' if from_cache else 'api'})"
                 )
                 await message.channel.send(embed=embed, reference=message, mention_author=False)
                 logger.debug(f"Traduction staff->user envoyee pour ticket {ticket['id']}")
@@ -409,7 +421,7 @@ class TicketsCog(commands.Cog):
                 )
                 return
 
-        category_id = guild_config.get("ticket_category_id")
+        category_id = _safe_int(guild_config.get("ticket_category_id"))
         if not category_id:
             await interaction.followup.send(
                 "La categorie des tickets n'est pas configuree. "
@@ -418,11 +430,28 @@ class TicketsCog(commands.Cog):
             )
             return
 
-        category = interaction.guild.get_channel(int(category_id))
-        if not category:
+        # The category may be missing from cache right after startup.
+        category = interaction.guild.get_channel(category_id)
+        if category is None:
+            try:
+                category = await interaction.guild.fetch_channel(category_id)
+            except Exception:
+                category = None
+        if category is None:
+            try:
+                category = await self.bot.fetch_channel(category_id)
+            except Exception:
+                category = None
+
+        if (
+            not category
+            or not isinstance(category, discord.CategoryChannel)
+            or int(getattr(category.guild, "id", 0) or 0) != int(interaction.guild.id)
+        ):
             await interaction.followup.send(
-                "Categorie des tickets introuvable. Verifiez la configuration sur le panel.",
-                ephemeral=True
+                "Categorie des tickets introuvable (ID invalide ou pas une categorie). "
+                "Verifiez la configuration sur le panel.",
+                ephemeral=True,
             )
             return
 
@@ -604,7 +633,7 @@ class TicketsCog(commands.Cog):
             base_embed.add_field(name="Priorité", value=f"`{pr_label}`", inline=True)
             base_embed.add_field(
                 name="Langues",
-                value=f"User: `{(user_lang or 'auto').upper()}` · Staff: `{(staff_lang or 'en').upper()}`",
+                value=f"User: `{get_lang_name(user_lang or 'auto')}` · Staff: `{get_lang_name(staff_lang or 'en')}`",
                 inline=True,
             )
             await interaction.channel.send(embed=base_embed)
@@ -814,7 +843,7 @@ class TicketCloseView(discord.ui.View):
             base_embed.add_field(name="Priorité", value=f"`{pr_label}`", inline=True)
             base_embed.add_field(
                 name="Langues",
-                value=f"User: `{(user_lang or 'auto').upper()}` · Staff: `{(staff_lang or 'en').upper()}`",
+                value=f"User: `{get_lang_name(user_lang or 'auto')}` · Staff: `{get_lang_name(staff_lang or 'en')}`",
                 inline=True,
             )
             channel = interaction.channel

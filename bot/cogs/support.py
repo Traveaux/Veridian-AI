@@ -27,10 +27,24 @@ class SupportCog(commands.Cog):
             return
 
         guild_config = GuildModel.get(message.guild.id)
-        if (not guild_config
-                or not guild_config.get("support_channel_id")
-                or not guild_config.get("public_support", 1)
-                or message.channel.id != guild_config["support_channel_id"]):
+        if not guild_config:
+            return
+
+        # Normaliser les types venant de la DB (souvent int, parfois str selon driver/migrations)
+        try:
+            support_channel_id = int(guild_config.get("support_channel_id") or 0)
+        except Exception:
+            support_channel_id = 0
+
+        try:
+            public_support_enabled = int(guild_config.get("public_support", 1) or 0) == 1
+        except Exception:
+            public_support_enabled = bool(guild_config.get("public_support", 1))
+
+        if not support_channel_id or not public_support_enabled:
+            return
+
+        if message.channel.id != support_channel_id:
             return
 
         if len(message.content.split()) < MIN_MESSAGE_LENGTH:

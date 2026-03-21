@@ -4,9 +4,6 @@
 -- Mise a jour : nouvelles colonnes dashboard, KB CRUD, audit log, guild features
 -- ============================================================================
 
-CREATE DATABASE IF NOT EXISTS veridian CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-USE veridian;
-
 -- ============================================================================
 -- VAI_GUILDS - Serveurs Discord enregistres + configuration complete
 -- Nouvelles colonnes : welcome_channel_id, features_json, updated_at

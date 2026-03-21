@@ -24,6 +24,13 @@ let state = {
   currentPage: "dashboard",
 };
 
+function normalizeSnowflake(raw) {
+  const s = String(raw || "").trim();
+  if (!s) return null;
+  const m = s.match(/\d{5,}/);
+  return m ? m[0] : null;
+}
+
 // ─────────────────────────────────────────────────────────────
 // INIT
 // ─────────────────────────────────────────────────────────────
@@ -717,12 +724,11 @@ function renderLanguageStats(languages) {
       const code = l.user_language || l.lang || "?";
       const pctRaw = Math.round(((l.count || 0) / total) * 100);
       const pct = Math.max(0, Math.min(100, pctRaw));
-      const flag = LANG_FLAGS[code] || "🌐";
       const name = LANG_NAMES[code] || code.toUpperCase();
       return `
       <div class="progress-item">
         <div class="progress-header">
-          <div class="progress-label">${escHtml(flag)} ${escHtml(name)}</div>
+          <div class="progress-label">${escHtml(name)}</div>
           <div class="progress-pct">${pct}%</div>
         </div>
         <div class="progress-track">
@@ -771,8 +777,8 @@ function renderTickets(tickets) {
   tbody.innerHTML = tickets.map((t) => {
     const statusClass = { open: "pill pending", closed: "pill paid", "in_progress": "pill premium" }[t.status] || "pill";
     const statusLabel = { open: "Ouvert", closed: "Fermé", in_progress: "En cours" }[t.status] || t.status;
-    const date = t.opened_at ? new Date(t.opened_at).toLocaleDateString("fr-FR") : "—";
-    const flag = LANG_FLAGS[t.user_language] || "🌐";
+    const ts = new Date(t.opened_at).getTime();
+    const date = !isNaN(ts) ? new Date(ts).toLocaleString("fr-FR") : (t.opened_at || "—");
     const priorityRaw = (t.priority || "medium").toLowerCase();
     const priorityLabelMap = {
       low: "Bas",
@@ -806,7 +812,7 @@ function renderTickets(tickets) {
           </select>` : ""}
         </div>
       </td>
-      <td>${escHtml(flag)} ${escHtml((t.user_language || "").toUpperCase())}</td>
+      <td>${escHtml(LANG_NAMES[t.user_language] || (t.user_language || "").toUpperCase())}</td>
       <td>${escHtml(t.assigned_staff_name || "—")}</td>
       <td class="mono-grey">${date}</td>
       <td>
@@ -1143,9 +1149,9 @@ function initSettingsTabs() {
   const deleteBtn = document.getElementById("settings-ticket-delete-btn");
 
   const buildTicketOpenPayload = () => {
-    const channelRaw = (document.getElementById("settings-ticket-open-channel")?.value || "").replace(/[#@]/g, "").trim();
+    const channelRaw = normalizeSnowflake(document.getElementById("settings-ticket-open-channel")?.value || "");
     const payload = {
-      ticket_open_channel_id: channelRaw ? (parseInt(channelRaw, 10) || null) : null,
+      ticket_open_channel_id: channelRaw,
       ticket_open_message: (document.getElementById("settings-ticket-open-message")?.value || "").trim(),
       ticket_selector_enabled: (document.getElementById("settings-ticket-open-type")?.value || "button") === "select",
       ticket_button_label: (document.getElementById("settings-ticket-button-label")?.value || "").trim(),
@@ -1357,21 +1363,12 @@ function initSettingsSave() {
       ai_prompt_enabled: getToggleState("ai_prompt_enabled"),
     };
 
-    // Extraire les IDs depuis les champs texte (retirer # et @)
-    const supportVal = (document.getElementById("settings-support-channel")?.value || "").replace(/[#@]/g, "").trim();
-    cfg.support_channel_id = supportVal ? (parseInt(supportVal, 10) || null) : null;
-
-    const catVal = (document.getElementById("settings-ticket-category")?.value || "").replace(/[#@]/g, "").trim();
-    cfg.ticket_category_id = catVal ? (parseInt(catVal, 10) || null) : null;
-
-    const staffVal = (document.getElementById("settings-staff-role")?.value || "").replace(/[#@]/g, "").trim();
-    cfg.staff_role_id = staffVal ? (parseInt(staffVal, 10) || null) : null;
-
-    const logVal = (document.getElementById("settings-log-channel")?.value || "").replace(/[#@]/g, "").trim();
-    cfg.log_channel_id = logVal ? (parseInt(logVal, 10) || null) : null;
-
-    const openChanVal = (document.getElementById("settings-ticket-open-channel")?.value || "").replace(/[#@]/g, "").trim();
-    cfg.ticket_open_channel_id = openChanVal ? (parseInt(openChanVal, 10) || null) : null;
+    // Ne pas utiliser parseInt sur les snowflakes Discord (> 2^53-1 en JS).
+    cfg.support_channel_id = normalizeSnowflake(document.getElementById("settings-support-channel")?.value || "");
+    cfg.ticket_category_id = normalizeSnowflake(document.getElementById("settings-ticket-category")?.value || "");
+    cfg.staff_role_id = normalizeSnowflake(document.getElementById("settings-staff-role")?.value || "");
+    cfg.log_channel_id = normalizeSnowflake(document.getElementById("settings-log-channel")?.value || "");
+    cfg.ticket_open_channel_id = normalizeSnowflake(document.getElementById("settings-ticket-open-channel")?.value || "");
 
     try {
       await apiPut(`/internal/guild/${state.currentGuild.id}/config`, cfg);
@@ -1561,10 +1558,9 @@ async function loadSuperAdminData() {
 }
 
 async function adminActivateSub() {
-  const guildIdRaw = document.getElementById("admin-guild-id")?.value?.trim();
+  const guildId = normalizeSnowflake(document.getElementById("admin-guild-id")?.value?.trim());
   const plan = document.getElementById("admin-plan")?.value || "premium";
-  const guildId = parseInt(guildIdRaw, 10);
-  if (!Number.isFinite(guildId)) return showToast("Guild ID invalide", "warn");
+  if (!guildId) return showToast("Guild ID invalide", "warn");
 
   try {
     await apiPost("/internal/admin/activate-sub", { guild_id: guildId, plan, duration_days: 30 });
@@ -1575,9 +1571,8 @@ async function adminActivateSub() {
 }
 
 async function adminRevokeSub() {
-  const guildIdRaw = document.getElementById("admin-guild-id")?.value?.trim();
-  const guildId = parseInt(guildIdRaw, 10);
-  if (!Number.isFinite(guildId)) return showToast("Guild ID invalide", "warn");
+  const guildId = normalizeSnowflake(document.getElementById("admin-guild-id")?.value?.trim());
+  if (!guildId) return showToast("Guild ID invalide", "warn");
 
   try {
     await apiPost("/internal/revoke-sub", { guild_id: guildId });
