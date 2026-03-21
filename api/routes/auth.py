@@ -191,13 +191,14 @@ def discord_login():
 
     # OAuth CSRF protection: state stored server-side in a cookie
     state = secrets.token_urlsafe(24)
-    auth_url = f"{DISCORD_OAUTH_URL}?{urlencode({
-        'client_id': client_id,
-        'redirect_uri': redirect_uri,
-        'response_type': 'code',
-        'scope': 'identify email guilds',
-        'state': state,
-    })}"
+    query_params = {
+        "client_id": client_id,
+        "redirect_uri": redirect_uri,
+        "response_type": "code",
+        "scope": "identify email guilds",
+        "state": state,
+    }
+    auth_url = f"{DISCORD_OAUTH_URL}?{urlencode(query_params)}"
     logger.info(f"Login Discord -> {redirect_uri}")
     resp = RedirectResponse(url=auth_url)
     # SameSite=Lax: sent on top-level GET callback; HttpOnly prevents JS read.
