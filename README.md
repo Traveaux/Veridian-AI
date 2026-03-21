@@ -30,9 +30,10 @@ Bot Discord polyvalent basé sur l'intelligence artificielle. Support multilingu
 
 ### Étapes
 
-1. **Cloner/Déployer le projet**
+1. **Cloner le projet**
    ```bash
-   cd "bot ia"
+   git clone https://github.com/Traveaux/Veridian-AI.git
+   cd Veridian-AI
    ```
 
 2. **Créer l'environnement virtuel**
@@ -204,7 +205,7 @@ Admin (web.veridiancloud.xyz)
 ## 📁 Structure du Projet
 
 ```
-bot ia/
+Veridian-AI/
 ├── bot/
 │   ├── main.py                 # Point d'entrée bot
 │   ├── config.py               # Constantes globales
@@ -230,8 +231,12 @@ bot ia/
 │       └── auth.py              # OAuth2 Discord
 │
 ├── web/
-│   ├── templates/              # HTML templates
-│   └── static/                 # CSS (Tailwind) + JS
+│   ├── index.html              # Landing page
+│   ├── dashboard.html          # Dashboard d'administration
+│   ├── css/                    # Styles CSS
+│   ├── js/                     # Scripts JS + i18n
+│   ├── locales/                # Traductions frontend
+│   └── assets/                 # Logos et ressources statiques
 │
 ├── database/
 │   └── schema.sql              # Schéma MySQL complet
@@ -262,10 +267,10 @@ cd api
 uvicorn main:app --reload --host 127.0.0.1 --port 8000
 ```
 
-### Lancer les tests (à implémenter)
+### Vérifications rapides
 
 ```bash
-pytest tests/
+python -m compileall bot api
 ```
 
 ### Syntaxe de Commit
@@ -324,4 +329,4 @@ MIT - 2025 Veridian AI
 
 ---
 
-**Dernière mise à jour:** Février 2025
+**Dernière mise à jour:** 21 mars 2026
