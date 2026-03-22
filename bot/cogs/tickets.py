@@ -237,6 +237,7 @@ class TicketsCog(commands.Cog):
         embed.add_field(name="Langue utilisateur", value=f"`{ul}`", inline=True)
         embed.add_field(name="Langue staff", value=f"`{sl}`", inline=True)
         # Priorité du ticket (bas / moyen / haut / prioritaire)
+        pr_raw = (priority or "medium").strip().lower()
         pr_label = {
             "low": "Bas",
             "medium": "Moyen",
