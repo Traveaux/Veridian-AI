@@ -129,6 +129,7 @@ def security_headers() -> dict[str, str]:
         "X-Content-Type-Options": "nosniff",
         "Referrer-Policy": "no-referrer",
         "Permissions-Policy": "geolocation=(), microphone=(), camera=()",
+        "Content-Security-Policy": "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'self';",
         # API responses should not be cached (tokens, configs, PII).
         "Cache-Control": "no-store",
         "Pragma": "no-cache",

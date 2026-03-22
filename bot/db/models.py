@@ -301,6 +301,28 @@ class TicketModel:
             return cursor.fetchone()[0]
 
     @staticmethod
+    def get_inactive_open_tickets(days: int = 3) -> List[Dict]:
+        """Retourne les tickets ouverts sans message depuis X jours."""
+        with get_db_context() as conn:
+            cursor = conn.cursor(dictionary=True)
+            # On cherche les tickets 'open' dont le dernier message (ou creation si pas de message) date de plus de X jours.
+            query = f"""
+                SELECT t.* FROM {DB_TABLE_PREFIX}tickets t
+                LEFT JOIN (
+                    SELECT ticket_id, MAX(sent_at) as last_msg
+                    FROM {DB_TABLE_PREFIX}ticket_messages
+                    GROUP BY ticket_id
+                ) m ON t.id = m.ticket_id
+                WHERE t.status IN ('open', 'in_progress')
+                AND (
+                    (m.last_msg IS NULL AND t.opened_at < DATE_SUB(NOW(), INTERVAL %s DAY))
+                    OR (m.last_msg IS NOT NULL AND m.last_msg < DATE_SUB(NOW(), INTERVAL %s DAY))
+                )
+            """
+            cursor.execute(query, (days, days))
+            return cursor.fetchall()
+
+    @staticmethod
     def close(ticket_id: int, transcript: str = "", close_reason: str = "") -> bool:
         with get_db_context() as conn:
             cursor = conn.cursor()
@@ -727,6 +749,17 @@ class KnowledgeBaseModel:
                 (kb_id,)
             )
             return cursor.fetchone()
+
+    @staticmethod
+    def search(guild_id: int, query: str, limit: int = 5) -> List[Dict]:
+        """Recherche simple par mots-clés dans la KB."""
+        with get_db_context() as conn:
+            cursor = conn.cursor(dictionary=True)
+            # Simple keyword search on question and answer
+            search_query = f"SELECT * FROM {DB_TABLE_PREFIX}knowledge_base WHERE guild_id = %s AND is_active = 1 AND (question LIKE %s OR answer LIKE %s) LIMIT %s"
+            like_query = f"%{query}%"
+            cursor.execute(search_query, (guild_id, like_query, like_query, limit))
+            return cursor.fetchall()
 
     @staticmethod
     def update(kb_id: int, **kwargs) -> bool:
@@ -1240,3 +1273,64 @@ class TempCodeModel:
             except Exception as e:
                 logger.error(f"Erreur cleanup temp_codes: {e}")
                 return 0
+
+
+# ============================================================================
+# VAI_PENDING_NOTIFICATIONS
+# ============================================================================
+
+class PendingNotificationModel:
+
+    @staticmethod
+    def add(user_id: int, message: str) -> bool:
+        """Ajoute une notification en attente d'envoi."""
+        with get_db_context() as conn:
+            cursor = conn.cursor()
+            try:
+                query = f"INSERT INTO {DB_TABLE_PREFIX}pending_notifications (user_id, message) VALUES (%s, %s)"
+                cursor.execute(query, (user_id, message))
+                return True
+            except Exception as e:
+                logger.error(f"Erreur ajout notification pendante: {e}")
+                return False
+
+    @staticmethod
+    def list_pending(limit: int = 20) -> List[Dict]:
+        """Récupére les notifications à envoyer (max 5 tentatives)."""
+        with get_db_context() as conn:
+            cursor = conn.cursor(dictionary=True)
+            try:
+                cursor.execute(
+                    f"SELECT * FROM {DB_TABLE_PREFIX}pending_notifications "
+                    f"WHERE attempts < 5 ORDER BY created_at ASC LIMIT %s",
+                    (limit,)
+                )
+                return cursor.fetchall()
+            except Exception:
+                return []
+
+    @staticmethod
+    def delete(notif_id: int) -> bool:
+        """Supprime une notification (après envoi réussi)."""
+        with get_db_context() as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute(f"DELETE FROM {DB_TABLE_PREFIX}pending_notifications WHERE id = %s", (notif_id,))
+                return True
+            except Exception:
+                return False
+
+    @staticmethod
+    def increment_attempt(notif_id: int) -> bool:
+        """Incrémente le compteur d'essais après un échec."""
+        with get_db_context() as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    f"UPDATE {DB_TABLE_PREFIX}pending_notifications "
+                    f"SET attempts = attempts + 1, last_attempt = NOW() WHERE id = %s",
+                    (notif_id,)
+                )
+                return True
+            except Exception:
+                return False

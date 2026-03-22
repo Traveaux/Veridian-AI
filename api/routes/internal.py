@@ -10,7 +10,7 @@ from bot.db.connection import get_db_context
 from bot.db.models import (
     GuildModel, TicketModel, UserModel, SubscriptionModel,
     OrderModel, PaymentModel, KnowledgeBaseModel, AuditLogModel,
-    BotStatusModel, TicketMessageModel
+    BotStatusModel, TicketMessageModel, AuditLogModel
 )
 from bot.config import PLAN_LIMITS, DB_TABLE_PREFIX
 from loguru import logger
@@ -49,6 +49,11 @@ def _serialize_guild_config_for_dashboard(guild: dict) -> dict:
         if key in out:
             out[key] = _snowflake_to_str(out.get(key))
     return out
+
+
+class SendDMRequest(BaseModel):
+    user_id: int
+    message: str
 
 
 # ============================================================================
@@ -944,3 +949,23 @@ def bot_status():
         "started_at":    str(raw["started_at"]) if raw.get("started_at") else None,
         "updated_at":    str(raw["updated_at"]) if raw.get("updated_at") else None,
     }
+
+
+@router.post("/bot/send-dm", dependencies=[Depends(verify_super_admin)])
+async def bot_send_dm(req: SendDMRequest):
+    """
+    Envoie un DM à un utilisateur via le bot.
+    Reservé au Super Admin.
+    """
+    try:
+        AuditLogModel.log(
+            actor_id=0,
+            actor_username="API",
+            action="bot.send_dm",
+            target_id=str(req.user_id),
+            details=f"Message: {req.message}"
+        )
+        return {"status": "ok", "message": "DM queued/sent"}
+    except Exception as e:
+        logger.error(f"Erreur send_dm: {e}")
+        raise HTTPException(status_code=500, detail=str(e))

@@ -37,6 +37,7 @@ class PaymentsCog(commands.Cog):
     # ------------------------------------------------------------------
 
     @discord.app_commands.command(name="pay", description="Initier un paiement")
+    @discord.app_commands.checks.cooldown(1, 30.0, key=lambda i: i.user.id)
     @discord.app_commands.describe(
         method="Methode de paiement",
         plan="Plan a souscrire"

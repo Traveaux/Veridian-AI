@@ -11,7 +11,7 @@ import os
 import json
 from datetime import datetime
 from bot.db.connection import get_db_context
-from bot.db.models import SubscriptionModel, PaymentModel, OrderModel
+from bot.db.models import SubscriptionModel, PaymentModel, OrderModel, PendingNotificationModel
 from bot.services.notifications import notify_bot_owner_payment
 
 router = APIRouter(prefix="/webhook", tags=["webhook"])
@@ -91,12 +91,20 @@ async def oxapay_webhook(request: Request):
             if order_id:
                 OrderModel.update_status(order_id, "paid", "OxaPay webhook")
             
-            # 3. Créer/activer abonnement
-            SubscriptionModel.create_or_update(
+            # 3. Créer/activer abonnement (30 jours par défaut)
+            SubscriptionModel.create(
                 guild_id=guild_id,
                 user_id=user_id,
                 plan=plan,
-                is_active=True
+                payment_id=payment_id,
+                duration_days=30
+            )
+
+            # 4. Ajouter une notification DM pour l'utilisateur
+            PendingNotificationModel.add(
+                user_id=user_id,
+                content=f"🚀 Votre abonnement **{plan.upper()}** a été activé avec succès sur votre serveur !\nMerci pour votre confiance. Vous pouvez maintenant profiter de toutes les fonctionnalités avancées.",
+                category="payment_success"
             )
         
         # 4. Notifier le Bot Owner

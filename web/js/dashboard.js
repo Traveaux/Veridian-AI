@@ -8,9 +8,9 @@
 // ─────────────────────────────────────────────────────────────
 // CONFIG
 // ─────────────────────────────────────────────────────────────
-const API_BASE = "https://api.veridiancloud.xyz:201";
+const API_BASE = "https://api.veridiancloud.xyz";
 
-const DISCORD_REDIRECT_URI = "https://api.veridiancloud.xyz:201/auth/callback";
+const DISCORD_REDIRECT_URI = "https://api.veridiancloud.xyz/auth/callback";
 
 // ─────────────────────────────────────────────────────────────
 // STATE
@@ -1032,7 +1032,7 @@ async function closeTicket(ticketId) {
 
 async function loadOrders() {
   try {
-    const data = await apiFetch(`/internal/orders/pending`, { auth: true });
+    const data = await apiFetch(`/dashboard/orders/pending`, { auth: true });
     renderOrders(data.orders || []);
   } catch (e) {
     console.warn("Orders:", e.message);
@@ -1082,10 +1082,13 @@ async function validateOrder(btn, orderId, status) {
   siblings.forEach((b) => (b.disabled = true));
 
   try {
-    await apiFetch(`/internal/orders/${encodeURIComponent(orderId)}/status`, {
-      method: "PUT",
+    const endpointMap = { paid: "validate", partial: "partial", rejected: "reject" };
+    const endpoint = endpointMap[status] || "status";
+    
+    await apiFetch(`/dashboard/orders/${encodeURIComponent(orderId)}/${endpoint}`, {
+      method: "POST",
       auth: true,
-      body: { status },
+      body: status === "rejected" ? { reason: "Refusé par l'admin" } : {},
     });
 
     const card = btn.closest(".order-card");
@@ -1508,8 +1511,8 @@ async function loadSuperAdminData() {
   if (ordersContainer) ordersContainer.innerHTML = `<div style="color:var(--text3);font-size:13px;text-align:center;padding:24px">Chargement…</div>`;
 
   const [globalStats, pendingOrders, botStatus] = await Promise.allSettled([
-    apiFetch("/internal/admin/stats", { auth: true }),
-    apiFetch("/internal/orders/pending", { auth: true }),
+    apiFetch("/dashboard/stats", { auth: true }),
+    apiFetch("/dashboard/orders/pending", { auth: true }),
     apiFetch("/internal/bot/status", { auth: true }),
   ]);
 
@@ -1664,9 +1667,9 @@ function renderBarChart(container, data) {
     .map(
       (d) => `
     <div class="bar-group">
-      <div class="bar-value">${d.val}</div>
+      <div class="bar-value">${Number(d.val)}</div>
       <div class="bar" style="height:0" data-height="${Math.round((d.val / max) * 100)}%"></div>
-      <div class="bar-label">${d.day}</div>
+      <div class="bar-label">${escHtml(d.day)}</div>
     </div>`
     )
     .join("");

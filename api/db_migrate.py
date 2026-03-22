@@ -93,57 +93,48 @@ def _split_sql_statements(sql: str) -> list[str]:
     return statements
 
 
-def _apply_schema_file(sql_path: Path) -> None:
+def _apply_schema_file(sql_path: Path, *, only_views: bool = False, skip_views: bool = False) -> None:
     sql_text = sql_path.read_text(encoding="utf-8", errors="replace")
     statements = _split_sql_statements(sql_text)
 
-    non_views: list[str] = []
-    views: list[str] = []
+    to_run: list[str] = []
 
     for stmt in statements:
         head = stmt.lstrip().split(None, 4)[:4]
         head_str = " ".join(head).lower()
         if head_str.startswith("create database") or head_str.startswith("use "):
             continue
-        if head_str.startswith("create or replace view") or head_str.startswith("create view"):
-            views.append(stmt)
-        else:
-            non_views.append(stmt)
+        
+        is_view = head_str.startswith("create or replace view") or head_str.startswith("create view")
+        
+        if only_views and not is_view:
+            continue
+        if skip_views and is_view:
+            continue
+        
+        to_run.append(stmt)
 
     with get_db_context() as conn:
         cursor = conn.cursor()
 
-        # Pass 1: tables/indexes/inserts (avoid failing early on views that depend on new columns).
-        for stmt in non_views:
+        for stmt in to_run:
             try:
                 cursor.execute(stmt)
             except Exception as e:
-                # Make schema execution idempotent enough for startup runs.
                 msg = str(e).lower()
+                # Common ignorable errors during idempotent migration
                 ignorable = (
                     "duplicate key name" in msg
                     or "duplicate column name" in msg
                     or "already exists" in msg
+                    or ("unknown column" in msg and only_views)
+                    or ("doesn't exist" in msg and only_views)
                 )
                 if ignorable:
                     continue
-                raise
-
-        # Pass 2: views (best-effort; schema drift can break them temporarily).
-        for stmt in views:
-            try:
-                cursor.execute(stmt)
-            except Exception as e:
-                msg = str(e).lower()
-                # Common drift: columns missing at the time of view creation.
-                ignorable = (
-                    "unknown column" in msg
-                    or "doesn't exist" in msg
-                    or "table" in msg and "doesn't exist" in msg
-                )
-                if ignorable:
-                    logger.warning(f"[db] View skipped (schema drift): {str(e)[:180]}")
-                    continue
+                
+                # For non-views, we might want to log but continue if it's potentially non-critical
+                # but for now we follow the existing behavior of raising unless ignorable.
                 raise
 
 
@@ -431,6 +422,52 @@ def _ensure_knowledge_base_migrations() -> None:
                     logger.warning(f"[db] ALTER {table}.is_active: {e}")
 
 
+def _ensure_audit_log_and_notifications_migrations() -> None:
+    """Crée les tables d'audit et de notifications si elles manquent."""
+    # Audit Log
+    audit_table = f"{DB_TABLE_PREFIX}audit_log"
+    if not _table_exists(audit_table):
+        with get_db_context() as conn:
+            cursor = conn.cursor()
+            cursor.execute(f"""
+                CREATE TABLE IF NOT EXISTS {audit_table} (
+                    id              INT AUTO_INCREMENT PRIMARY KEY,
+                    actor_id        BIGINT                          COMMENT 'Discord user ID de l auteur',
+                    actor_username  VARCHAR(100),
+                    guild_id        BIGINT                          COMMENT 'Serveur concerne (NULL si global)',
+                    action          VARCHAR(100)    NOT NULL        COMMENT 'Ex: order.validate, guild.config, kb.create',
+                    target_id       VARCHAR(100)                    COMMENT 'ID de l objet cible',
+                    details         JSON                            COMMENT 'Donnees supplementaires libres',
+                    ip_address      VARCHAR(45),
+                    created_at      TIMESTAMP       DEFAULT CURRENT_TIMESTAMP,
+                    KEY idx_actor   (actor_id),
+                    KEY idx_guild   (guild_id),
+                    KEY idx_action  (action),
+                    KEY idx_created (created_at)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            """)
+            logger.info(f"[db] Table {audit_table} creee")
+
+    # Pending Notifications
+    notif_table = f"{DB_TABLE_PREFIX}pending_notifications"
+    if not _table_exists(notif_table):
+        with get_db_context() as conn:
+            cursor = conn.cursor()
+            cursor.execute(f"""
+                CREATE TABLE IF NOT EXISTS {notif_table} (
+                    id              INT AUTO_INCREMENT PRIMARY KEY,
+                    user_id         BIGINT          NOT NULL        COMMENT 'ID utilisateur Discord destinataire',
+                    message         TEXT            NOT NULL        COMMENT 'Contenu du message DM',
+                    attempts        INT             DEFAULT 0       COMMENT 'Nombre de tentatives denvoi',
+                    last_attempt    TIMESTAMP       NULL            COMMENT 'Derniere tentative',
+                    created_at      TIMESTAMP       DEFAULT CURRENT_TIMESTAMP,
+                    KEY idx_user    (user_id),
+                    KEY idx_attempts (attempts)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            """)
+            logger.info(f"[db] Table {notif_table} creee")
+
+
 def ensure_database_schema() -> None:
     """
     Creates/migrates the MySQL schema at API startup using the `database/` folder.
@@ -450,23 +487,22 @@ def ensure_database_schema() -> None:
         return
 
     logger.info(f"[db] Migration schema depuis {schema_sql}")
-    # 1) Apply non-view statements first (tables/indexes/inserts).
-    # 2) Apply targeted ALTERs (schema drift fixes).
-    # 3) Re-apply views (so they can reference the new columns).
-    _apply_schema_file(schema_sql)
+    # 1) Apply tables/indexes/inserts (skip views to avoid failures on missing columns).
+    _apply_schema_file(schema_sql, skip_views=True)
 
-    # Targeted ALTERs for already-existing tables.
+    # 2) Targeted ALTERs (schema drift fixes).
     _ensure_dashboard_sessions_migrations()
     _ensure_bot_status_migrations()
     _ensure_ticket_migrations()
     _ensure_knowledge_base_migrations()
     _ensure_guild_v04_migrations()
+    _ensure_audit_log_and_notifications_migrations()
 
-    # Re-apply views after ALTERs (best-effort).
+    # 3) Re-apply views (so they can reference the new columns).
     try:
-        _apply_schema_file(schema_sql)
+        _apply_schema_file(schema_sql, only_views=True)
     except Exception as e:
         # Don't block startup only because of view creation issues in older schemas.
-        logger.warning(f"[db] Second pass schema apply failed (views?): {str(e)[:180]}")
+        logger.warning(f"[db] View creation failed (drift?): {str(e)[:180]}")
 
     logger.info("[db] Migration OK")

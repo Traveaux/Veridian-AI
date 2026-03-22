@@ -406,6 +406,21 @@ CREATE TABLE IF NOT EXISTS vai_temp_codes (
 --     DO DELETE FROM vai_temp_codes WHERE expires_at < NOW() OR used = 1;
 
 -- ============================================================================
+-- VAI_PENDING_NOTIFICATIONS - File d'attente des notifications (DMs)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS vai_pending_notifications (
+    id              INT AUTO_INCREMENT PRIMARY KEY,
+    user_id         BIGINT          NOT NULL        COMMENT 'ID utilisateur Discord destinataire',
+    message         TEXT            NOT NULL        COMMENT 'Contenu du message DM',
+    attempts        INT             DEFAULT 0       COMMENT 'Nombre de tentatives denvoi',
+    last_attempt    TIMESTAMP       NULL            COMMENT 'Derniere tentative',
+    created_at      TIMESTAMP       DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_user    (user_id),
+    KEY idx_attempts (attempts)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
 -- Migration depuis v0.2 (si la DB existe deja)
 -- CREATE TABLE IF NOT EXISTS vai_temp_codes (...) -- voir ci-dessus
 -- ============================================================================

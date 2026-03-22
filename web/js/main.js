@@ -70,7 +70,7 @@ document.querySelectorAll('a[href^="#"]').forEach(a => {
 document.querySelectorAll('[data-discord]').forEach(btn => {
   btn.addEventListener('click', () => {
     // Replace with real Discord invite link
-    window.open('https://discord.com/api/oauth2/authorize', '_blank');
+    window.open('https://discord.com/oauth2/authorize?client_id=1475845849333498038', '_blank');
   });
 });
 

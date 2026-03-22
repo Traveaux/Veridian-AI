@@ -10,6 +10,7 @@ from loguru import logger
 from dotenv import load_dotenv
 import asyncio
 import sys
+import signal
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -148,10 +149,14 @@ async def on_ready():
         heartbeat_loop.start()
         logger.info("✓ Heartbeat démarré (intervalle: 60s)")
 
-    # Démarrer le poller de déploiement du message d'ouverture des tickets
     if not ticket_open_deploy_loop.is_running():
         ticket_open_deploy_loop.start()
         logger.info("✓ Ticket deploy poller démarré (intervalle: 30s)")
+
+    # Démarrer le processeur de notifications (DMs)
+    if not notification_processor_loop.is_running():
+        notification_processor_loop.start()
+        logger.info("✓ Notification processor démarré (intervalle: 60s)")
     
     # Premier heartbeat immédiat
     await _update_bot_status()
@@ -165,6 +170,43 @@ async def ticket_open_deploy_loop():
 
 @ticket_open_deploy_loop.before_loop
 async def before_ticket_open_deploy_loop():
+    await bot.wait_until_ready()
+
+
+@tasks.loop(minutes=1.0)
+async def notification_processor_loop():
+    """Traite la file d'attente des notifications (DMs)."""
+    try:
+        from bot.db.models import PendingNotificationModel
+        
+        pending = PendingNotificationModel.list_pending(limit=10)
+        if not pending:
+            return
+            
+        logger.debug(f"[bot] Processing {len(pending)} pending notifications")
+        for notif in pending:
+            try:
+                # Récupérer l'utilisateur
+                user = bot.get_user(notif["user_id"]) or await bot.fetch_user(notif["user_id"])
+                if user:
+                    await user.send(notif["message"])
+                    PendingNotificationModel.delete(notif["id"])
+                    logger.debug(f"DM envoyé a {notif['user_id']}")
+                else:
+                    logger.warning(f"Utilisateur {notif['user_id']} introuvable pour notification")
+                    PendingNotificationModel.increment_attempt(notif["id"])
+            except discord.Forbidden:
+                logger.warning(f"DMs fermes pour {notif['user_id']}, suppression notification")
+                PendingNotificationModel.delete(notif["id"])
+            except Exception as e:
+                logger.error(f"Echec envoi DM {notif['id']}: {e}")
+                PendingNotificationModel.increment_attempt(notif["id"])
+    except Exception as e:
+        logger.error(f"Erreur loop notifications: {e}")
+
+
+@notification_processor_loop.before_loop
+async def before_notification_processor_loop():
     await bot.wait_until_ready()
 
 
@@ -429,14 +471,25 @@ async def main():
     
     try:
         await bot.start(token)
-    except discord.errors.LoginFailure:
-        logger.error("✗ Erreur d'authentification Discord")
     except Exception as e:
-        logger.error(f"✗ Erreur démarrage bot: {e}")
+        logger.error(f"✗ Erreur bot: {e}")
 
+def handle_exit(sig, frame):
+    logger.info(f"Signal {sig} reçu, arrêt du bot...")
+    # asyncio.run_coroutine_threadsafe(bot.close(), bot.loop)
+    # Since we are in the main thread with asyncio.run(main()),
+    # it's better to let KeyboardInterrupt or a task cancellation handle it.
+    raise KeyboardInterrupt
 
 if __name__ == '__main__':
+    # Handle SIGTERM (Docker)
+    if sys.platform != "win32":
+        signal.signal(signal.SIGTERM, handle_exit)
+
     try:
         asyncio.run(main())
     except KeyboardInterrupt:
-        logger.info("Bot arrêté par l'utilisateur")
+        logger.info("Bot arrêté proprement")
+    except Exception as e:
+        logger.critical(f"Erreur fatale: {e}")
+        sys.exit(1)

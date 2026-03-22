@@ -42,15 +42,24 @@ class GroqClient:
         
         return Groq(api_key=self.api_keys[key_index])
 
-    def generate_support_response(self, message: str, guild_name: str, language: str = 'en',
-                                   custom_prompt: str = None) -> str:
-        """Génère une réponse IA avec fallback sur 4 clés.
-        
-        Si custom_prompt est fourni et non vide, il remplace le prompt système par défaut.
-        Cela permet aux owners de serveur de personnaliser le comportement de l'IA.
-        """
+    def generate_support_response(self, message: str, guild_name: str, guild_id: int = None, 
+                                   language: str = 'en', custom_prompt: str = None) -> str:
+        """Génère une réponse IA avec fallback sur 4 clés et enrichissement KB."""
         if not self.api_keys:
             return "Erreur: Aucune clé Groq disponible"
+
+        kb_context = ""
+        if guild_id:
+            try:
+                from bot.db.models import KnowledgeBaseModel
+                kb_entries = KnowledgeBaseModel.search(guild_id, message, limit=3)
+                if kb_entries:
+                    kb_texts = []
+                    for entry in kb_entries:
+                        kb_texts.append(f"Q: {entry['question']}\nA: {entry['answer']}")
+                    kb_context = "\n\nConnaissances spécifiques au serveur :\n" + "\n---\n".join(kb_texts)
+            except Exception as e:
+                logger.debug(f"KB Search failed: {e}")
 
         if custom_prompt and custom_prompt.strip():
             # Le prompt personnalisé est utilisé tel quel, avec le nom du serveur injecté
@@ -61,6 +70,10 @@ class GroqClient:
         else:
             system_prompt = SYSTEM_PROMPT_SUPPORT.format(guild_name=guild_name)
         
+        # Inject KB context if found
+        if kb_context:
+            system_prompt += kb_context
+
         for attempt in range(len(self.api_keys)):
             try:
                 client = self._get_client(force_key_index=attempt)
@@ -274,3 +287,134 @@ class GroqClient:
             
         except Exception:
             return False
+
+    def analyze_first_message(self, message: str, language: str = 'fr') -> str:
+        """Analyse le premier message d'un ticket pour en extraire l'intention (Smart Welcome)."""
+        if not self.api_keys or not message.strip():
+            return ""
+
+        system = (
+            "You are a support assistant. Your task is to summarize the user's initial request in ONE short sentence.\n"
+            "Rules:\n"
+            "- Be extremely concise (max 15 words).\n"
+            f"- Respond in the requested language: {language}.\n"
+            "- Focus on the main intent (e.g., 'Problème de paiement PayPal', 'Question sur l'abonnement Premium').\n"
+            "- No greeting, no punctuation at the end if possible.\n"
+        )
+
+        for attempt in range(len(self.api_keys)):
+            try:
+                client = self._get_client(force_key_index=attempt)
+                if not client:
+                    continue
+
+                completion = client.chat.completions.create(
+                    model=GROQ_MODEL_FAST,
+                    messages=[
+                        {"role": "system", "content": system},
+                        {"role": "user", "content": message}
+                    ],
+                    temperature=0.3,
+                    max_tokens=40,
+                    stream=False,
+                )
+                
+                res = completion.choices[0].message.content.strip()
+                logger.info(f"✓ Analyse premier message générée (clé #{attempt + 1})")
+                return res
+            except Exception as e:
+                logger.warning(f"⚠ Clé Groq #{attempt + 1} analyse: {str(e)[:80]}")
+
+        return ""
+
+    def detect_payment_intent(self, message: str) -> bool:
+        """Détecte si l'utilisateur exprime une intention d'achat ou de paiement."""
+        if not self.api_keys or not message.strip():
+            return False
+
+        # Quick check for keywords to avoid unnecessary API calls
+        keywords = ["payer", "acheter", "prix", "abonnement", "premium", "pay", "buy", "price", "subscription", "upgrade"]
+        if not any(k in message.lower() for k in keywords):
+            return False
+
+        system = (
+            "You are a support classifier. Determine if the user message expresses an intent to BUY, PAY for a subscription, or ask about PRICING/PLANS.\n"
+            "Respond with 'YES' if they want to pay/buy/upgrade or ask about prices, 'NO' otherwise.\n"
+            "Rules: ONLY respond with YES or NO.\n"
+        )
+
+        for attempt in range(len(self.api_keys)):
+            try:
+                client = self._get_client(force_key_index=attempt)
+                if not client:
+                    continue
+
+                completion = client.chat.completions.create(
+                    model=GROQ_MODEL_FAST,
+                    messages=[
+                        {"role": "system", "content": system},
+                        {"role": "user", "content": message}
+                    ],
+                    temperature=0.0,
+                    max_tokens=5,
+                    stream=False,
+                )
+                
+                res = completion.choices[0].message.content.strip().upper()
+                if "YES" in res:
+                    logger.info(f"✓ Intention de paiement détectée (clé #{attempt + 1})")
+                    return True
+                return False
+            except Exception:
+                continue
+
+        return False
+
+    def detect_malicious_content(self, message: str) -> str:
+        """
+        Détecte si le contenu est malveillant (scam, phishing, insultes graves).
+        Retourne : 'safe', 'suspicious' ou 'malicious'
+        """
+        if not self.api_keys or not message.strip():
+            return "safe"
+
+        # Keywords for quick check
+        keywords = ["scam", "hack", "token", "password", "nitro", "free", "gift", "link code", "auth"]
+        # On ne bloque pas direct, on utilise Groq pour juger le contexte
+        
+        system = (
+            "You are a security moderator for a Discord bot. Analyze the user message for SCAMS, PHISHING, or MALICIOUS INTENT.\n"
+            "Categories:\n"
+            "- 'malicious': obvious scam, phishing link, token grabbing attempt.\n"
+            "- 'suspicious': weird request, asking for sensitive info, potential soft scam.\n"
+            "- 'safe': normal user message.\n"
+            "Rules: ONLY respond with 'safe', 'suspicious', or 'malicious'.\n"
+        )
+
+        for attempt in range(len(self.api_keys)):
+            try:
+                client = self._get_client(force_key_index=attempt)
+                if not client:
+                    continue
+
+                completion = client.chat.completions.create(
+                    model=GROQ_MODEL_FAST,
+                    messages=[
+                        {"role": "system", "content": system},
+                        {"role": "user", "content": message}
+                    ],
+                    temperature=0.0,
+                    max_tokens=10,
+                    stream=False,
+                )
+                
+                res = completion.choices[0].message.content.strip().lower()
+                if "malicious" in res:
+                    return "malicious"
+                if "suspicious" in res:
+                    return "suspicious"
+                return "safe"
+            except Exception:
+                continue
+
+        return "safe"

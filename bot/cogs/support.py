@@ -19,6 +19,8 @@ class SupportCog(commands.Cog):
         self.bot         = bot
         self.groq_client = GroqClient()
         self.translator  = TranslatorService()
+        # Rate limit: 1 reponse IA toutes les 30s par salon (pour eviter le spam API)
+        self._cd = commands.CooldownMapping.from_cooldown(1, 30.0, commands.BucketType.channel)
         logger.info("Cog Support Public charge")
 
     @commands.Cog.listener()
@@ -50,6 +52,11 @@ class SupportCog(commands.Cog):
         if len(message.content.split()) < MIN_MESSAGE_LENGTH:
             return
 
+        # Check rate limit
+        retry_after = self._cd.update_rate_limit(message)
+        if retry_after:
+            return
+
         async with message.channel.typing():
             try:
                 language = self.translator.detect_language(message.content) or "en"
@@ -60,12 +67,37 @@ class SupportCog(commands.Cog):
                 response = self.groq_client.generate_support_response(
                     message.content,
                     guild_name=message.guild.name,
+                    guild_id=message.guild.id,
                     language=language,
                     custom_prompt=custom_prompt
                 )
                 await message.reply(response[:2000], mention_author=False,
                                     suppress_embeds=True)
                 logger.info(f"Reponse support envoyee sur {message.guild.id}")
+
+                # AI Moderation: Alert staff if malicious content detected
+                try:
+                    security_status = self.groq_client.detect_malicious_content(message.content)
+                    if security_status in ["malicious", "suspicious"]:
+                        log_channel_id = guild_config.get("log_channel_id")
+                        if log_channel_id:
+                            log_channel = message.guild.get_channel(int(log_channel_id))
+                            if log_channel:
+                                color = discord.Color.red() if security_status == "malicious" else discord.Color.orange()
+                                alert_embed = discord.Embed(
+                                    title="🛡️ Alerte Sécurité IA",
+                                    description=(
+                                        f"Un message potentiellement **{security_status}** a été détecté.\n\n"
+                                        f"**Utilisateur:** {message.author.mention} (`{message.author.id}`)\n"
+                                        f"**Salon:** {message.channel.mention}\n"
+                                        f"**Contenu:** {message.content[:500]}..."
+                                    ),
+                                    color=color
+                                )
+                                await log_channel.send(embed=alert_embed)
+                                logger.warning(f"Alerte secu IA ({security_status}) pour {message.author.id}")
+                except Exception as e:
+                    logger.debug(f"AI Moderation check failed: {e}")
 
             except Exception as e:
                 logger.error(f"Erreur support IA: {e}")

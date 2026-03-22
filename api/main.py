@@ -9,6 +9,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from loguru import logger
 import os
+import time
 from datetime import datetime
 from pathlib import Path
 
@@ -82,18 +83,59 @@ INTERNAL_API_SECRET = get_internal_api_secret()
 _JWT_SECRET = get_jwt_secret()
 
 
+# ============================================================================
+# Rate Limiting (Simple In-Memory)
+# ============================================================================
+# Dict for storing ip -> [timestamps]
+_RATE_LIMIT_DATA: dict[str, list[float]] = {}
+_RATE_LIMIT_MAX = 60    # total requests
+_RATE_LIMIT_WINDOW = 60 # per 60 seconds
+
+
+@app.middleware("http")
+async def _rate_limit_middleware(request: Request, call_next):
+    # Only rate limit sensitive endpoints (API /auth and /internal)
+    path = request.url.path
+    if not (path.startswith("/auth/") or path.startswith("/internal/")):
+        return await call_next(request)
+
+    client_ip = request.client.host if request.client else "unknown"
+    now = time.time()
+
+    # Clean old timestamps
+    history = _RATE_LIMIT_DATA.get(client_ip, [])
+    history = [t for t in history if now - t < _RATE_LIMIT_WINDOW]
+
+    if len(history) >= _RATE_LIMIT_MAX:
+        logger.warning(f"Rate limit exceeded for {client_ip} on {path}")
+        return JSONResponse(
+            status_code=429,
+            content={"detail": "Too Many Requests. Please try again later."}
+        )
+
+    history.append(now)
+    _RATE_LIMIT_DATA[client_ip] = history
+    return await call_next(request)
+
+
 @app.middleware("http")
 async def _security_headers_middleware(request: Request, call_next):
     try:
         resp = await call_next(request)
-    except HTTPException:
-        # Let FastAPI handle HTTPException so proper status codes/details are returned.
-        raise
+    except HTTPException as e:
+        # Standard HTTP exceptions (401, 403, 404, etc.)
+        return JSONResponse(status_code=e.status_code, content={"detail": e.detail})
     except Exception as e:
         # Avoid exceptions bubbling outside of CORS middleware (would drop ACAO headers).
         logger.exception(f"Unhandled exception: {e}")
-        resp = JSONResponse(status_code=500, content={"detail": "Internal Server Error"})
-    for k, v in security_headers().items():
+        # Sanitize error in production
+        detail = "Internal Server Error"
+        if not is_production():
+            detail = f"Debug: {str(e)}"
+        return JSONResponse(status_code=500, content={"detail": detail})
+
+    headers = security_headers()
+    for k, v in headers.items():
         # Don't override explicit headers set by routes.
         resp.headers.setdefault(k, v)
     return resp
@@ -125,11 +167,11 @@ app.add_middleware(
     ],
 )
 
-# ============================================================================
 # Include Routers
-# ============================================================================
 app.include_router(auth_router)
-app.include_router(internal_router)   # ← FIX: routes /internal/* maintenant enregistrées
+app.include_router(internal_router)
+from api.routes.dashboard import router as dashboard_router
+app.include_router(dashboard_router)
 
 # ============================================================================
 # Logging
@@ -211,7 +253,10 @@ async def health_check():
         }
     except Exception as e:
         logger.error(f"✗ Health check error: {e}")
-        return {"status": "degraded", "version": VERSION, "error": str(e)}
+        detail = "Service degraded"
+        if not is_production():
+            detail = f"Debug: {str(e)}"
+        return JSONResponse(status_code=503, content={"status": "degraded", "detail": detail})
 
 
 @app.post("/webhook/oxapay", tags=["Webhooks"])

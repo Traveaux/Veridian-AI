@@ -4,7 +4,7 @@ La configuration du systeme (category, staff role, etc.) se fait via le dashboar
 """
 
 import discord
-from discord.ext import commands
+from discord.ext import commands, tasks
 from loguru import logger
 import json
 
@@ -115,7 +115,14 @@ class TicketsCog(commands.Cog):
                 return
 
             if custom_id.startswith("vai:ticket_open:"):
-                # Button-based open
+                # Cooldown check for button interactions (manual)
+                # 1 ticket every 60s per user
+                bucket = self.open_ticket.get_cooldown_retry_after(interaction)
+                if bucket:
+                    return await interaction.response.send_message(
+                        f"Veuillez patienter {int(bucket)}s avant d'ouvrir un autre ticket.",
+                        ephemeral=True
+                    )
                 return await self.open_ticket(interaction, topic="")
         except Exception as e:
             logger.debug(f"on_interaction ticket_open ignored: {e}")
@@ -125,7 +132,79 @@ class TicketsCog(commands.Cog):
         self.bot         = bot
         self.translator  = TranslatorService()
         self.groq_client = GroqClient()
+        self.auto_close_task.start()
         logger.info("Cog Tickets charge")
+
+    def cog_unload(self):
+        self.auto_close_task.cancel()
+
+    @tasks.loop(hours=24)
+    async def auto_close_task(self):
+        """Ferme les tickets inactifs depuis plus de 3 jours."""
+        try:
+            inactive = TicketModel.get_inactive_open_tickets(days=3)
+            for t in inactive:
+                channel = self.bot.get_channel(int(t["channel_id"]))
+                if channel:
+                    try:
+                        embed = discord.Embed(
+                            title="Ticket fermé automatiquement",
+                            description="Ce ticket a été fermé car il était inactif depuis plus de 3 jours.",
+                            color=discord.Color.orange()
+                        )
+                        await channel.send(embed=embed)
+                        # We trigger the close logic (summary, etc.)
+                        # Since we don't have an interaction, we call a helper or the model directly.
+                        # For simplicity, we just close it in DB and log it.
+                        TicketModel.close(t["id"], transcript="Fermeture automatique (inactivité)", close_reason="Inactivité > 3 jours")
+                        logger.info(f"Ticket {t['id']} fermé automatiquement (inactivité)")
+                    except Exception as e:
+                        logger.warning(f"Failed to auto-close channel for ticket {t['id']}: {e}")
+                else:
+                    # Channel already deleted? Just close in DB
+                    TicketModel.close(t["id"], transcript="Fermeture automatique (canal introuvable)", close_reason="Canal introuvable")
+        except Exception as e:
+            logger.error(f"Erreur auto_close_task: {e}")
+
+    @auto_close_task.before_loop
+    async def before_auto_close(self):
+        await self.bot.wait_until_ready()
+
+    @commands.Cog.listener()
+    async def on_guild_channel_delete(self, channel: discord.abc.GuildChannel):
+        """Ferme le ticket en DB si le channel est supprimé manuellement."""
+        ticket = TicketModel.get_by_channel(channel.id)
+        if ticket and ticket["status"] != "closed":
+            TicketModel.close(ticket["id"], transcript="Canal supprimé manuellement", close_reason="Channel supprimé")
+            logger.info(f"Ticket {ticket['id']} fermé suite à suppression du canal")
+
+    @commands.Cog.listener()
+    async def on_member_remove(self, member: discord.Member):
+        """Ferme les tickets ouverts si l'utilisateur quitte le serveur."""
+        # Note: Optimization could be done by adding a get_open_by_user method.
+        # But this is okay for now.
+        try:
+            # We don't have a direct model method for this, so we'll just check all open tickets for this guild
+            with get_db_context() as conn:
+                cursor = conn.cursor(dictionary=True)
+                cursor.execute(
+                    f"SELECT id, channel_id FROM {DB_TABLE_PREFIX}tickets "
+                    f"WHERE guild_id = %s AND user_id = %s AND status != 'closed'",
+                    (member.guild.id, member.id)
+                )
+                tickets = cursor.fetchall()
+                for t in tickets:
+                    TicketModel.close(t["id"], transcript="Utilisateur a quitté le serveur", close_reason="L'utilisateur a quitté")
+                    logger.info(f"Ticket {t['id']} fermé (utilisateur {member.id} a quitté)")
+                    # Optionnel: supprimer le channel si configuré? Habituellement oui.
+                    chan = member.guild.get_channel(int(t["channel_id"]))
+                    if chan:
+                        try:
+                            await chan.delete(reason="L'utilisateur a quitté le serveur")
+                        except Exception:
+                            pass
+        except Exception as e:
+            logger.error(f"Erreur on_member_remove ticket cleanup: {e}")
 
     def _build_ticket_welcome_embed(self, *, ticket_id: int,
                                    user_language: str | None,
@@ -158,7 +237,6 @@ class TicketsCog(commands.Cog):
         embed.add_field(name="Langue utilisateur", value=f"`{ul}`", inline=True)
         embed.add_field(name="Langue staff", value=f"`{sl}`", inline=True)
         # Priorité du ticket (bas / moyen / haut / prioritaire)
-        pr_raw = (priority or "medium").strip().lower()
         pr_label = {
             "low": "Bas",
             "medium": "Moyen",
@@ -166,6 +244,12 @@ class TicketsCog(commands.Cog):
             "urgent": "Prioritaire",
         }.get(pr_raw, pr_raw or "Moyen")
         embed.add_field(name="Priorité", value=f"`{pr_label}`", inline=True)
+
+        # Smart Analysis (Intent)
+        intent = (cfg.get("last_analysis") or "").strip()
+        if intent:
+            embed.add_field(name="Analyse IA", value=f"*{intent}*", inline=False)
+            
         return embed
 
     async def _try_update_welcome_embed(self, channel: discord.TextChannel, ticket_id: int):
@@ -186,7 +270,7 @@ class TicketsCog(commands.Cog):
                 ticket_id=ticket_id,
                 user_language=ticket.get("user_language"),
                 staff_language=ticket.get("staff_language"),
-                guild_config=guild_config,
+                guild_config={**guild_config, "last_analysis": ticket.get("ai_intent")},
                 priority=ticket.get("priority"),
             )
             await welcome_msg.edit(embed=embed, view=TicketCloseView(ticket_id, self.bot))
@@ -234,6 +318,12 @@ class TicketsCog(commands.Cog):
                     else:
                         UserModel.upsert(message.author.id, message.author.name, user_db.get("preferred_language"))
 
+                    # Smart Welcome: Analyze first message intent
+                    intent = self.groq_client.analyze_first_message(text, detected_lang or "fr")
+                    if intent:
+                        TicketModel.update(ticket["id"], ai_intent=intent)
+                        ticket["ai_intent"] = intent
+
                     await self._try_update_welcome_embed(message.channel, ticket["id"])
 
             staff_lang = ticket.get("staff_language") or guild_config.get("default_language") or "en"
@@ -261,6 +351,55 @@ class TicketsCog(commands.Cog):
                     logger.debug(f"Traduction user->staff envoyee pour ticket {ticket['id']}")
                 except Exception as e:
                     logger.error(f"Erreur traduction ticket {ticket['id']}: {e}")
+
+            # Ticket-to-Payment: Suggest payment if intent detected
+            try:
+                if self.groq_client.detect_payment_intent(text):
+                    payment_embed = discord.Embed(
+                        title="💎 Veridian AI - Plans & Tarifs",
+                        description=(
+                            "Il semble que vous soyez intéressé par nos offres !\n\n"
+                            "**✨ Plan Premium (5€/mois)**\n"
+                            "- Support IA illimité\n"
+                            "- Traduction automatique des tickets\n"
+                            "- Résumés de tickets à la clôture\n\n"
+                            "**🚀 Plan Pro (15€/mois)**\n"
+                            "- Tout le Premium +\n"
+                            "- Modération IA avancée\n"
+                            "- Suggestions de réponses pour le staff\n\n"
+                            "👉 [Consulter les offres et s'abonner](https://veridiancloud.xyz/dashboard/billing)"
+                        ),
+                        color=discord.Color.gold()
+                    )
+                    payment_embed.set_footer(text="Paiement sécurisé via Carte ou Crypto (OxaPay)")
+                    await message.channel.send(embed=payment_embed)
+                    logger.info(f"Suggestion paiement envoyée pour ticket {ticket['id']}")
+            except Exception as e:
+                logger.debug(f"Payment suggestion failed for ticket {ticket['id']}: {e}")
+
+            # AI Moderation: Alert staff if malicious content detected
+            try:
+                security_status = self.groq_client.detect_malicious_content(message.content)
+                if security_status in ["malicious", "suspicious"]:
+                    log_channel_id = guild_config.get("log_channel_id")
+                    if log_channel_id:
+                        log_channel = message.guild.get_channel(int(log_channel_id))
+                        if log_channel:
+                            color = discord.Color.red() if security_status == "malicious" else discord.Color.orange()
+                            alert_embed = discord.Embed(
+                                title="🛡️ Sécurité IA - Ticket",
+                                description=(
+                                    f"Détection **{security_status}** dans un ticket.\n\n"
+                                    f"**Utilisateur:** {message.author.mention} (`{message.author.id}`)\n"
+                                    f"**Ticket:** {message.channel.mention}\n"
+                                    f"**Contenu:** {message.content[:300]}..."
+                                ),
+                                color=color
+                            )
+                            await log_channel.send(embed=alert_embed)
+                            logger.warning(f"Alerte secu ticket ({security_status}) pour {message.author.id}")
+            except Exception as e:
+                logger.debug(f"AI Moderation check failed for ticket: {e}")
 
             # Stocker le message (et la traduction si presente)
             try:
@@ -386,6 +525,7 @@ class TicketsCog(commands.Cog):
 
     @discord.app_commands.command(name="ticket", description="Ouvrir un ticket de support")
     @discord.app_commands.describe(topic="(Optionnel) Type / sujet du ticket")
+    @discord.app_commands.checks.cooldown(1, 60.0, key=lambda i: i.user.id)
     async def open_ticket(self, interaction: discord.Interaction, topic: str = ""):
         try:
             if not interaction.response.is_done():
@@ -569,6 +709,10 @@ class TicketsCog(commands.Cog):
             or interaction.user.id == BOT_OWNER_DISCORD_ID
         )
 
+        if ticket["status"] == "closed":
+            await interaction.followup.send("Ce ticket est déjà fermé.", ephemeral=True)
+            return
+
         if not (is_user or is_staff):
             await interaction.followup.send("Permission refusee.", ephemeral=True)
             return
@@ -648,22 +792,61 @@ class TicketsCog(commands.Cog):
         except Exception as e:
             logger.debug(f"Envoi resume fermeture commande ignore: {e}")
 
-        # Envoyer la transcription en DM
+        # Envoyer la transcription en DM / Salon de logs
         try:
-            user  = await self.bot.fetch_user(ticket["user_id"])
-            embed = discord.Embed(
-                title="Resume du ticket",
-                description=transcript_user or transcript_staff,
-                color=discord.Color.greyple()
-            )
-            await user.send(embed=embed)
-        except Exception:
-            pass
+            guild = self.bot.get_guild(int(ticket["guild_id"]))
+            guild_config = GuildModel.get(int(ticket["guild_id"])) or {}
+            
+            # 1. DM au client
+            try:
+                user = self.bot.get_user(ticket["user_id"]) or await self.bot.fetch_user(ticket["user_id"])
+                if user:
+                    user_embed = discord.Embed(
+                        title="Résumé de votre ticket",
+                        description=transcript_user or transcript_staff or "Aucun résumé disponible.",
+                        color=discord.Color.blue()
+                    )
+                    user_embed.set_footer(text=f"Ticket #{ticket['id']} · {guild.name if guild else ''}")
+                    await user.send(embed=user_embed)
+            except Exception:
+                pass
+
+            # 2. Log Channel (Staff)
+            log_channel_id = _safe_int(guild_config.get("log_channel_id"))
+            if log_channel_id:
+                log_chan = self.bot.get_channel(log_channel_id) or await self.bot.fetch_channel(log_channel_id)
+                if log_chan:
+                    log_embed = discord.Embed(
+                        title=f"Ticket Clôturé · #{ticket['id']}",
+                        description=f"**Utilisateur:** <@{ticket['user_id']}> ({ticket['user_username']})\n**Raison:** {reason}\n\n**Résumé IA:**\n{transcript_staff or 'Non généré'}",
+                        color=discord.Color.dark_grey()
+                    )
+                    log_embed.add_field(name="Priorité", value=f"`{pr_label}`", inline=True)
+                    log_embed.add_field(name="Ouvert le", value=f"<t:{int(ticket['opened_at'].timestamp())}:f>", inline=True)
+                    await log_chan.send(embed=log_embed)
+
+        except Exception as e:
+            logger.debug(f"Erreur logs/DMs fermeture: {e}")
 
         await interaction.followup.send(
-            "Ticket ferme. Resume envoye en DM.", ephemeral=True
+            "Ticket fermé. Résumé envoyé.", ephemeral=True
         )
-        logger.info(f"Ticket {ticket['id']} ferme par {interaction.user.id}")
+        logger.info(f"Ticket {ticket['id']} fermé par {interaction.user.id}")
+
+    async def cog_app_command_error(self, interaction: discord.Interaction, error: discord.app_commands.AppCommandError):
+        if isinstance(error, discord.app_commands.CommandOnCooldown):
+            if not interaction.response.is_done():
+                await interaction.response.send_message(
+                    f"Veuillez patienter {int(error.retry_after)}s avant de réutiliser cette commande.",
+                    ephemeral=True
+                )
+            else:
+                await interaction.followup.send(
+                    f"Veuillez patienter {int(error.retry_after)}s avant de réutiliser cette commande.",
+                    ephemeral=True
+                )
+        else:
+            logger.error(f"Erreur TicketCog command: {error}")
 
 
 # ============================================================================
@@ -773,6 +956,10 @@ class TicketCloseView(discord.ui.View):
         ticket = TicketModel.get(self.ticket_id)
         if not ticket:
             await interaction.response.send_message("Ticket introuvable.", ephemeral=True)
+            return
+
+        if ticket["status"] == "closed":
+            await interaction.response.send_message("Ce ticket est déjà fermé.", ephemeral=True)
             return
 
         is_user  = interaction.user.id == ticket["user_id"]

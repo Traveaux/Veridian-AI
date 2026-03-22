@@ -32,7 +32,10 @@ services:
     container_name: veridian-bot
     environment:
       - DISCORD_TOKEN=${DISCORD_TOKEN}
-      - GROQ_API_KEY=${GROQ_API_KEY}
+      - GROQ_API_KEY_1=${GROQ_API_KEY_1}
+      - GROQ_API_KEY_2=${GROQ_API_KEY_2}
+      - GROQ_API_KEY_3=${GROQ_API_KEY_3}
+      - GROQ_API_KEY_4=${GROQ_API_KEY_4}
       - DB_HOST=mysql
       - DB_PORT=3306
       - DB_USER=${DB_USER}
@@ -42,6 +45,7 @@ services:
       - OXAPAY_WEBHOOK_SECRET=${OXAPAY_WEBHOOK_SECRET}
       - BOT_OWNER_DISCORD_ID=${BOT_OWNER_DISCORD_ID}
       - PAYPAL_EMAIL=${PAYPAL_EMAIL}
+      - ENVIRONMENT=production
     depends_on:
       mysql:
         condition: service_healthy
@@ -55,7 +59,7 @@ services:
   api:
     build:
       context: .
-      dockerfile: Dockerfile.api
+      dockerfile: docker/Dockerfile.api
     container_name: veridian-api
     environment:
       - DB_HOST=mysql
@@ -63,10 +67,12 @@ services:
       - DB_USER=${DB_USER}
       - DB_PASSWORD=${DB_PASSWORD}
       - DB_NAME=${DB_NAME}
+      - API_PORT=8000
       - INTERNAL_API_SECRET=${INTERNAL_API_SECRET}
       - JWT_SECRET=${JWT_SECRET}
       - DISCORD_CLIENT_ID=${DISCORD_CLIENT_ID}
       - DISCORD_CLIENT_SECRET=${DISCORD_CLIENT_SECRET}
+      - ENVIRONMENT=production
     ports:
       - "8000:8000"
     depends_on:
