@@ -328,8 +328,7 @@ WHERE s.is_active = 1
 CREATE OR REPLACE VIEW vai_pending_orders_view AS
 SELECT
     o.*,
-    u.username AS user_name,
-    g.name     AS guild_name
+    u.username AS user_name
 FROM vai_orders o
 LEFT JOIN vai_users  u ON o.user_id  = u.id
 LEFT JOIN vai_guilds g ON o.guild_id = g.id
