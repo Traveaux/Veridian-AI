@@ -239,6 +239,12 @@ class GuildConfigBody(BaseModel):
     ticket_button_style:         Optional[str]  = None
     ticket_button_emoji:         Optional[str]  = None
     ticket_welcome_message:      Optional[str]  = None
+    ticket_welcome_message_user: Optional[str]  = None
+    ticket_welcome_message_staff: Optional[str] = None
+    ticket_take_label:           Optional[str]  = None
+    ticket_close_label:          Optional[str]  = None
+    ticket_reopen_label:         Optional[str]  = None
+    ticket_transcript_label:     Optional[str]  = None
     ticket_welcome_color:        Optional[str]  = None
     ticket_selector_enabled:     Optional[bool] = None
     ticket_selector_placeholder: Optional[str]  = None
@@ -324,6 +330,12 @@ def get_guild_config(guild_id: int):
             "ticket_button_style": "primary",
             "ticket_button_emoji": "",
             "ticket_welcome_message": "",
+            "ticket_welcome_message_user": "",
+            "ticket_welcome_message_staff": "",
+            "ticket_take_label": "S'approprier le ticket",
+            "ticket_close_label": "Fermer le ticket",
+            "ticket_reopen_label": "Réouvrir",
+            "ticket_transcript_label": "Transcript",
             "ticket_welcome_color": "blue",
             "ticket_selector_enabled": 0,
             "ticket_selector_placeholder": "Selectionnez le type de ticket",
@@ -509,11 +521,75 @@ def close_ticket_dashboard(ticket_id: int, request: Request):
                     pass
             if int(ticket.get("guild_id", 0)) not in norm_allowed:
                 raise HTTPException(status_code=403, detail="Acces refuse a ce ticket")
-    TicketModel.close(ticket_id, close_reason="Ferme depuis le dashboard")
+
     actor_id = getattr(request.state, "user_id", None)
-    AuditLogModel.log(actor_id=actor_id or 0, action="ticket.close",
-                      guild_id=ticket["guild_id"], target_id=str(ticket_id))
-    return {"status": "success", "ticket_id": ticket_id}
+    current_status = str(ticket.get("status") or "").lower()
+
+    if current_status == "closed":
+        return {"status": "already_closed", "ticket_id": ticket_id, "ticket_status": "closed"}
+
+    if current_status != "pending_close":
+        next_status = "pending_close"
+        close_reason = "Demande de fermeture via dashboard"
+        TicketModel.update(ticket_id, status=next_status, close_reason=close_reason)
+        AuditLogModel.log(
+            actor_id=actor_id or 0,
+            action="ticket.request_close",
+            guild_id=ticket["guild_id"],
+            target_id=str(ticket_id),
+            details={"from": current_status or "open", "to": next_status},
+            ip_address=request.client.host if request.client else None,
+        )
+        return {
+            "status": "pending_confirmation",
+            "ticket_id": ticket_id,
+            "ticket_status": next_status,
+        }
+
+    TicketModel.close(
+        ticket_id,
+        close_reason=(ticket.get("close_reason") or "Ferme depuis le dashboard"),
+    )
+    AuditLogModel.log(
+        actor_id=actor_id or 0,
+        action="ticket.close",
+        guild_id=ticket["guild_id"],
+        target_id=str(ticket_id),
+        details={"from": current_status, "to": "closed"},
+        ip_address=request.client.host if request.client else None,
+    )
+    return {"status": "success", "ticket_id": ticket_id, "ticket_status": "closed"}
+
+
+@router.post("/ticket/{ticket_id}/reopen", dependencies=[Depends(verify_internal_auth)])
+def reopen_ticket_dashboard(ticket_id: int, request: Request):
+    ticket = TicketModel.get(ticket_id)
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+    if not getattr(request.state, "is_super_admin", False):
+        allowed = getattr(request.state, "guild_ids", None)
+        if allowed is not None:
+            norm_allowed = set()
+            for x in (allowed or []):
+                try:
+                    norm_allowed.add(int(x))
+                except Exception:
+                    pass
+            if int(ticket.get("guild_id", 0)) not in norm_allowed:
+                raise HTTPException(status_code=403, detail="Acces refuse a ce ticket")
+
+    restored_status = "in_progress" if ticket.get("assigned_staff_id") else "open"
+    TicketModel.update(ticket_id, status=restored_status, closed_at=None, close_reason=None, transcript="")
+    actor_id = getattr(request.state, "user_id", None)
+    AuditLogModel.log(
+        actor_id=actor_id or 0,
+        action="ticket.reopen",
+        guild_id=ticket["guild_id"],
+        target_id=str(ticket_id),
+        details={"from": ticket.get("status"), "to": restored_status},
+        ip_address=request.client.host if request.client else None,
+    )
+    return {"status": "success", "ticket_id": ticket_id, "ticket_status": restored_status}
 
 
 @router.put("/ticket/{ticket_id}/priority", dependencies=[Depends(verify_internal_auth)])
