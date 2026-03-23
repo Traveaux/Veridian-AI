@@ -702,6 +702,12 @@ class TicketsCog(commands.Cog):
         if not text and not message.attachments:
             return
 
+        if ticket.get("status") == "pending_close":
+            restored_status = "in_progress" if ticket.get("assigned_staff_id") else "open"
+            TicketModel.update(ticket["id"], status=restored_status, close_reason=None)
+            ticket["status"] = restored_status
+            await self._try_update_welcome_embed(message.channel, ticket["id"])
+
         guild_config = GuildModel.get(message.guild.id) or {}
         auto_translate = bool(guild_config.get("auto_translate", 1))
 
@@ -1256,117 +1262,191 @@ class TicketOpenSelectView(discord.ui.View):
 
 
 # ============================================================================
-# Vue avec bouton Fermer
+# Vue avec controles ticket
 # ============================================================================
 
-class TicketCloseView(discord.ui.View):
+class TicketControlView(discord.ui.View):
     def __init__(self, ticket_id: int, bot):
         super().__init__(timeout=None)
         self.ticket_id = ticket_id
-        self.bot       = bot
-        self.translator = TranslatorService()
-        self.groq_client = GroqClient()
+        self.bot = bot
+        self._refresh_buttons()
 
-    @discord.ui.button(label="Fermer le ticket", style=discord.ButtonStyle.danger)
+    def _refresh_buttons(self):
+        ticket = TicketModel.get(self.ticket_id) or {}
+        status = (ticket.get("status") or "open").strip().lower()
+        assigned_name = (ticket.get("assigned_staff_name") or "").strip()
+        guild_config = GuildModel.get(int(ticket.get("guild_id") or 0)) or {}
+        cog = self.bot.get_cog("TicketsCog")
+        labels = cog._ticket_control_labels(guild_config, assigned_name, status) if cog else {
+            "take": "S'approprier le ticket",
+            "close": "Fermer le ticket",
+            "reopen": "Réouvrir",
+            "transcript": "Transcript",
+        }
+
+        self.take_button.label = labels["take"]
+        self.take_button.style = discord.ButtonStyle.secondary
+        self.take_button.disabled = status == "closed"
+
+        self.close_button.label = labels["close"]
+        self.close_button.style = discord.ButtonStyle.danger if status == "pending_close" else discord.ButtonStyle.secondary
+        self.close_button.disabled = status == "closed"
+
+        self.reopen_button.label = labels["reopen"]
+        self.reopen_button.disabled = status not in {"pending_close", "closed"}
+        self.transcript_button.label = labels["transcript"]
+        self.transcript_button.disabled = not bool((ticket.get("transcript") or "").strip())
+
+    @discord.ui.button(label="S'approprier le ticket", style=discord.ButtonStyle.secondary, row=0, custom_id="vai:ticket_take")
+    async def take_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        ticket = TicketModel.get(self.ticket_id)
+        if not ticket:
+            await interaction.response.send_message("Ticket introuvable.", ephemeral=True)
+            return
+
+        if ticket.get("status") == "closed":
+            await interaction.response.send_message("Le ticket est déjà fermé.", ephemeral=True)
+            return
+
+        is_staff = (
+            interaction.user.guild_permissions.administrator
+            or interaction.user.id == BOT_OWNER_DISCORD_ID
+            or any(role.permissions.manage_channels for role in interaction.user.roles)
+        )
+        if not is_staff:
+            await interaction.response.send_message("Permission refusee.", ephemeral=True)
+            return
+
+        current_owner_id = int(ticket.get("assigned_staff_id") or 0)
+        if current_owner_id and current_owner_id != interaction.user.id and not interaction.user.guild_permissions.administrator:
+            await interaction.response.send_message("Ce ticket est déjà pris en charge par un autre membre du staff.", ephemeral=True)
+            return
+
+        new_status = "in_progress"
+        TicketModel.update(
+            self.ticket_id,
+            assigned_staff_id=interaction.user.id,
+            assigned_staff_name=interaction.user.display_name,
+            status=new_status,
+        )
+        self._refresh_buttons()
+        if isinstance(interaction.channel, discord.TextChannel):
+            cog = self.bot.get_cog("TicketsCog")
+            if cog:
+                await cog._try_update_welcome_embed(interaction.channel, self.ticket_id)
+            await interaction.response.send_message("Ticket pris en charge.", ephemeral=True)
+        else:
+            await interaction.response.send_message("Ticket mis à jour.", ephemeral=True)
+
+    @discord.ui.button(label="Fermer le ticket", style=discord.ButtonStyle.secondary, row=0, custom_id="vai:ticket_close")
     async def close_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         ticket = TicketModel.get(self.ticket_id)
         if not ticket:
             await interaction.response.send_message("Ticket introuvable.", ephemeral=True)
             return
 
-        if ticket["status"] == "closed":
-            await interaction.response.send_message("Ce ticket est déjà fermé.", ephemeral=True)
+        if not isinstance(interaction.channel, discord.TextChannel):
+            await interaction.response.send_message("Canal de ticket invalide.", ephemeral=True)
             return
 
-        is_user  = interaction.user.id == ticket["user_id"]
-        is_staff = interaction.user.guild_permissions.administrator
+        is_user = interaction.user.id == ticket["user_id"]
+        is_staff = (
+            interaction.user.guild_permissions.administrator
+            or interaction.user.id == BOT_OWNER_DISCORD_ID
+            or int(ticket.get("assigned_staff_id") or 0) == interaction.user.id
+        )
         if not (is_user or is_staff):
             await interaction.response.send_message("Permission refusee.", ephemeral=True)
             return
 
-        # Résumé IA + priorite + double embed (staff + client) best-effort
-        summary_staff = ""
-        summary_user = None
-        user_lang = None
-        staff_lang = None
-        try:
-            guild_config = GuildModel.get(int(ticket.get("guild_id") or 0)) or {}
-            auto_translate = bool(guild_config.get("auto_translate", 1))
+        current_status = (ticket.get("status") or "open").strip().lower()
+        cog = self.bot.get_cog("TicketsCog")
+        if not cog:
+            await interaction.response.send_message("Cog tickets introuvable.", ephemeral=True)
+            return
 
-            # Langues
-            user_lang = ticket.get("user_language") if ticket.get("user_language") not in (None, "", "auto") else None
-            if not user_lang:
-                user_db = UserModel.get(ticket.get("user_id"))
-                if user_db and user_db.get("preferred_language") not in (None, "", "auto"):
-                    user_lang = user_db.get("preferred_language")
-
-            staff_lang = ticket.get("staff_language") or guild_config.get("default_language") or "en"
-            if staff_lang == "auto":
-                staff_lang = guild_config.get("default_language") or "en"
-
-            msgs = TicketMessageModel.get_by_ticket(self.ticket_id)
-            last = msgs[-60:] if msgs else []
-            conversation = [
-                {"author": m.get("author_username") or str(m.get("author_id")), "content": m.get("original_content") or ""}
-                for m in last
-                if (m.get("original_content") or "").strip()
-            ]
-            lang_for_summary = staff_lang or user_lang or "en"
-            summary_staff = self.groq_client.generate_ticket_summary(conversation, lang_for_summary)
-
-            if auto_translate and user_lang and lang_for_summary and user_lang != lang_for_summary:
-                try:
-                    summary_user, _ = self.translator.translate_response_for_user(
-                        summary_staff, lang_for_summary, user_lang
-                    )
-                except Exception:
-                    summary_user = None
-        except Exception as e:
-            logger.warning(f"Resume IA bouton non genere: {e}")
-            summary_staff = ""
-            summary_user = None
-
-        TicketModel.close(self.ticket_id, transcript=summary_staff, close_reason="Ferme via bouton")
-
-        # Envoyer les embeds de resume dans le channel
-        try:
-            pr_raw = (ticket.get("priority") or "medium").strip().lower()
-            pr_label = {
-                "low": "Bas",
-                "medium": "Moyen",
-                "high": "Haut",
-                "urgent": "Prioritaire",
-            }.get(pr_raw, pr_raw or "Moyen")
-
-            base_embed = discord.Embed(
-                title="Résumé du ticket (staff)",
-                description=summary_staff or "Aucun résumé généré.",
-                color=discord.Color.greyple(),
+        if current_status != "pending_close":
+            TicketModel.update(self.ticket_id, status="pending_close", close_reason="Demande de fermeture via bouton")
+            self._refresh_buttons()
+            await cog._try_update_welcome_embed(interaction.channel, self.ticket_id)
+            await interaction.response.send_message(
+                "Demande de fermeture enregistrée. Un staff/admin doit confirmer.", ephemeral=True
             )
-            base_embed.add_field(name="Priorité", value=f"`{pr_label}`", inline=True)
-            base_embed.add_field(
-                name="Langues",
-                value=f"User: `{get_lang_name(user_lang or 'auto')}` · Staff: `{get_lang_name(staff_lang or 'en')}`",
-                inline=True,
-            )
-            channel = interaction.channel
-            if isinstance(channel, discord.TextChannel):
-                await channel.send(embed=base_embed)
+            return
 
-                if summary_user and user_lang and user_lang != staff_lang:
-                    user_embed = discord.Embed(
-                        title="Résumé du ticket (client)",
-                        description=summary_user,
-                        color=discord.Color.blurple(),
-                    )
-                    await channel.send(embed=user_embed)
-        except Exception as e:
-            logger.debug(f"Envoi resume fermeture bouton ignore: {e}")
-        button.disabled = True
-        await interaction.response.edit_message(
-            content="Ticket ferme.", view=self
+        if not is_staff:
+            await interaction.response.send_message("Seul le staff/admin peut confirmer la fermeture.", ephemeral=True)
+            return
+
+        await interaction.response.defer(ephemeral=True)
+        await cog._finalize_ticket_close(
+            channel=interaction.channel,
+            ticket=ticket,
+            closer=interaction.user,
+            reason="Fermeture confirmée via bouton",
         )
+        self._refresh_buttons()
+        await interaction.followup.send("Ticket fermé. Transcription envoyée.", ephemeral=True)
         logger.info(f"Ticket {self.ticket_id} ferme via bouton par {interaction.user.id}")
+
+    @discord.ui.button(label="Réouvrir", style=discord.ButtonStyle.success, row=1, custom_id="vai:ticket_reopen")
+    async def reopen_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        ticket = TicketModel.get(self.ticket_id)
+        if not ticket:
+            await interaction.response.send_message("Ticket introuvable.", ephemeral=True)
+            return
+
+        is_staff = (
+            interaction.user.guild_permissions.administrator
+            or interaction.user.id == BOT_OWNER_DISCORD_ID
+            or int(ticket.get("assigned_staff_id") or 0) == interaction.user.id
+        )
+        if not is_staff:
+            await interaction.response.send_message("Seul le staff/admin peut réouvrir le ticket.", ephemeral=True)
+            return
+
+        restored_status = "in_progress" if ticket.get("assigned_staff_id") else "open"
+        TicketModel.update(
+            self.ticket_id,
+            status=restored_status,
+            closed_at=None,
+            close_reason=None,
+            transcript="",
+        )
+        self._refresh_buttons()
+        if isinstance(interaction.channel, discord.TextChannel):
+            cog = self.bot.get_cog("TicketsCog")
+            if cog:
+                await cog._try_update_welcome_embed(interaction.channel, self.ticket_id)
+        await interaction.response.send_message("Ticket réouvert.", ephemeral=True)
+
+    @discord.ui.button(label="Transcript", style=discord.ButtonStyle.primary, row=1, custom_id="vai:ticket_transcript")
+    async def transcript_button(self, interaction: discord.Interaction, button: discord.ui.Button):
+        ticket = TicketModel.get(self.ticket_id)
+        if not ticket or not (ticket.get("transcript") or "").strip():
+            await interaction.response.send_message("Aucune transcription disponible pour le moment.", ephemeral=True)
+            return
+
+        cog = self.bot.get_cog("TicketsCog")
+        messages = TicketMessageModel.get_by_ticket(self.ticket_id)
+        file = None
+        if cog:
+            display_lang = ticket.get("staff_language") or "en"
+            if interaction.user.id == int(ticket.get("user_id") or 0) and ticket.get("user_language") not in (None, "", "auto"):
+                display_lang = ticket.get("user_language")
+            file = cog._build_transcript_file(
+                ticket=ticket,
+                messages=messages,
+                display_language=display_lang,
+                audience="user" if interaction.user.id == int(ticket.get("user_id") or 0) else "staff",
+            )
+        embed = discord.Embed(
+            title=f"Transcript · Ticket #{self.ticket_id}",
+            description=(ticket.get("transcript") or "")[:4000],
+            color=discord.Color.blurple(),
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True, file=file)
 
 
 async def setup(bot):
