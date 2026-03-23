@@ -17,8 +17,11 @@
   --text2:      #8aaa96;
   --text3:      #4a6655;
   --red:        #ff4d6d;
+  --red-dim:    rgba(255,77,109,0.10);
   --yellow:     #ffd166;
+  --yellow-dim: rgba(255,209,102,0.10);
   --blue:       #4da6ff;
+  --blue-dim:   rgba(77,166,255,0.10);
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -454,8 +457,30 @@ section { position: relative; z-index: 1; }
   display: flex;
   align-items: center;
   justify-content: center;
+  color: var(--accent);
   font-size: 20px;
   margin-bottom: 18px;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.03);
+}
+.feature-icon svg {
+  width: 20px;
+  height: 20px;
+  overflow: visible;
+}
+.feature-icon.tone-blue {
+  background: var(--blue-dim);
+  border-color: rgba(77,166,255,0.18);
+  color: var(--blue);
+}
+.feature-icon.tone-yellow {
+  background: var(--yellow-dim);
+  border-color: rgba(255,209,102,0.18);
+  color: var(--yellow);
+}
+.feature-icon.tone-red {
+  background: var(--red-dim);
+  border-color: rgba(255,77,109,0.18);
+  color: var(--red);
 }
 .feature-title {
   font-size: 16px;
