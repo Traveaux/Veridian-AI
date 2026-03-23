@@ -1255,6 +1255,48 @@ function initSettingsTabs() {
       }
     });
   }
+
+  const welcomeUserInput = document.getElementById("settings-ticket-welcome-message-user");
+  const welcomeStaffInput = document.getElementById("settings-ticket-welcome-message-staff");
+  const syncWelcomePreview = () => renderTicketWelcomePreview();
+  [welcomeUserInput, welcomeStaffInput].forEach((el) => {
+    if (el) el.addEventListener("input", syncWelcomePreview);
+  });
+  syncWelcomePreview();
+}
+
+function renderTemplatePreview(template, vars) {
+  return String(template || "").replace(/\{([a-z_]+)\}/gi, (_, rawKey) => {
+    const key = String(rawKey || "").toLowerCase();
+    return Object.prototype.hasOwnProperty.call(vars, key) ? vars[key] : `{${rawKey}}`;
+  });
+}
+
+function renderTicketWelcomePreview() {
+  const userEl = document.getElementById("settings-ticket-welcome-preview-user");
+  const staffEl = document.getElementById("settings-ticket-welcome-preview-staff");
+  if (!userEl || !staffEl) return;
+
+  const vars = {
+    ticket_id: "#1842",
+    user_mention: "@Jordan",
+    user_language: "Français",
+    staff_language: "Anglais",
+    assigned_staff: "Non assigné",
+    status: "Ouvert",
+  };
+
+  const userTemplate = (document.getElementById("settings-ticket-welcome-message-user")?.value || "").trim();
+  const staffTemplate = (document.getElementById("settings-ticket-welcome-message-staff")?.value || "").trim();
+
+  userEl.textContent = renderTemplatePreview(
+    userTemplate || "Hello {user_mention}, tell us what happened and we will assist you shortly.",
+    vars
+  );
+  staffEl.textContent = renderTemplatePreview(
+    staffTemplate || "Staff note: reply in {staff_language}. Assigned: {assigned_staff}.",
+    vars
+  );
 }
 
 async function loadSettings() {
@@ -1278,7 +1320,12 @@ async function loadSettings() {
       "settings-ticket-button-emoji": cfg.ticket_button_emoji || "",
       "settings-ticket-selector-placeholder": cfg.ticket_selector_placeholder || "Sélectionnez le type de ticket",
       "settings-ticket-selector-options": typeof cfg.ticket_selector_options === "string" ? cfg.ticket_selector_options : (cfg.ticket_selector_options ? JSON.stringify(cfg.ticket_selector_options, null, 2) : "[]"),
-      "settings-ticket-welcome-message": cfg.ticket_welcome_message || "",
+      "settings-ticket-welcome-message-user": cfg.ticket_welcome_message_user || cfg.ticket_welcome_message || "",
+      "settings-ticket-welcome-message-staff": cfg.ticket_welcome_message_staff || cfg.ticket_welcome_message || "",
+      "settings-ticket-take-label": cfg.ticket_take_label || "S'approprier le ticket",
+      "settings-ticket-close-label": cfg.ticket_close_label || "Fermer le ticket",
+      "settings-ticket-reopen-label": cfg.ticket_reopen_label || "Réouvrir",
+      "settings-ticket-transcript-label": cfg.ticket_transcript_label || "Transcript",
       "settings-ticket-welcome-color": cfg.ticket_welcome_color || "#4DA6FF",
       "settings-ticket-max-open": (cfg.ticket_max_open ?? 1),
       "settings-staff-languages": typeof cfg.staff_languages_json === "string" ? cfg.staff_languages_json : (cfg.staff_languages_json ? JSON.stringify(cfg.staff_languages_json, null, 2) : "[]"),
@@ -1312,6 +1359,7 @@ async function loadSettings() {
     if (openType) openType.value = cfg.ticket_selector_enabled ? "select" : "button";
     // ensure visibility refresh
     try { document.getElementById("settings-ticket-open-type")?.dispatchEvent(new Event("change")); } catch (_) {}
+    renderTicketWelcomePreview();
 
     // Deploy error display
     const errBox = document.getElementById("settings-ticket-deploy-error");
@@ -1390,7 +1438,13 @@ function initSettingsSave() {
       ticket_button_label: (document.getElementById("settings-ticket-button-label")?.value || "").trim() || "Ouvrir un ticket",
       ticket_button_style: (document.getElementById("settings-ticket-button-style")?.value || "primary").trim(),
       ticket_button_emoji: (document.getElementById("settings-ticket-button-emoji")?.value || "").trim(),
-      ticket_welcome_message: (document.getElementById("settings-ticket-welcome-message")?.value || "").trim(),
+      ticket_welcome_message: (document.getElementById("settings-ticket-welcome-message-user")?.value || "").trim(),
+      ticket_welcome_message_user: (document.getElementById("settings-ticket-welcome-message-user")?.value || "").trim(),
+      ticket_welcome_message_staff: (document.getElementById("settings-ticket-welcome-message-staff")?.value || "").trim(),
+      ticket_take_label: (document.getElementById("settings-ticket-take-label")?.value || "").trim() || "S'approprier le ticket",
+      ticket_close_label: (document.getElementById("settings-ticket-close-label")?.value || "").trim() || "Fermer le ticket",
+      ticket_reopen_label: (document.getElementById("settings-ticket-reopen-label")?.value || "").trim() || "Réouvrir",
+      ticket_transcript_label: (document.getElementById("settings-ticket-transcript-label")?.value || "").trim() || "Transcript",
       ticket_welcome_color: (document.getElementById("settings-ticket-welcome-color")?.value || "#4DA6FF").trim(),
       ticket_selector_enabled: (document.getElementById("settings-ticket-open-type")?.value || "button") === "select",
       ticket_selector_placeholder: (document.getElementById("settings-ticket-selector-placeholder")?.value || "").trim(),

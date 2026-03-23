@@ -682,8 +682,14 @@
             </div>
             <div class="card-body">
               <div class="form-group">
-                <label class="form-label">Message de bienvenue (dans le ticket)</label>
-                <textarea class="form-input" id="settings-ticket-welcome-message" rows="3" placeholder="Bienvenue ! Décrivez votre problème…" style="resize:vertical;font-family:'DM Sans',sans-serif"></textarea>
+                <label class="form-label">Message bienvenue utilisateur</label>
+                <textarea class="form-input" id="settings-ticket-welcome-message-user" rows="4" placeholder="Hello {user_mention}, tell us what happened and we will translate everything for you." style="resize:vertical;font-family:'DM Sans',sans-serif"></textarea>
+                <div style="font-size:10px;color:var(--text3);margin-top:4px">Fallback auto: anglais si la langue utilisateur est inconnue, sinon langue détectée/définie.</div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Message bienvenue staff</label>
+                <textarea class="form-input" id="settings-ticket-welcome-message-staff" rows="4" placeholder="Staff note: reply in {staff_language}. Assigned: {assigned_staff}." style="resize:vertical;font-family:'DM Sans',sans-serif"></textarea>
+                <div style="font-size:10px;color:var(--text3);margin-top:4px">Variables: <code>{ticket_id}</code> <code>{user_mention}</code> <code>{user_language}</code> <code>{staff_language}</code> <code>{assigned_staff}</code> <code>{status}</code></div>
               </div>
               <div class="form-group">
                 <label class="form-label">Couleur embed bienvenue</label>
@@ -694,6 +700,31 @@
                   <option value="#FF5050">Rouge</option>
                   <option value="#A855F7">Violet</option>
                 </select>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Prévisualisation embed</label>
+                <div id="settings-ticket-welcome-preview" style="background:var(--surface);border:1px solid var(--border2);border-radius:10px;padding:12px 14px">
+                  <div style="font-size:10px;font-family:'Space Mono',monospace;color:var(--text3);letter-spacing:.08em;margin-bottom:8px">APERÇU</div>
+                  <div id="settings-ticket-welcome-preview-user" style="white-space:pre-wrap;color:var(--text);font-size:12.5px;line-height:1.6;margin-bottom:10px">—</div>
+                  <div style="height:1px;background:var(--border);margin:10px 0"></div>
+                  <div id="settings-ticket-welcome-preview-staff" style="white-space:pre-wrap;color:var(--text2);font-size:12.5px;line-height:1.6">—</div>
+                </div>
+              </div>
+              <div class="form-group">
+                <label class="form-label">Libellé bouton prise en charge</label>
+                <input class="form-input" id="settings-ticket-take-label" type="text" placeholder="S'approprier le ticket">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Libellé bouton fermeture</label>
+                <input class="form-input" id="settings-ticket-close-label" type="text" placeholder="Fermer le ticket">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Libellé bouton réouverture</label>
+                <input class="form-input" id="settings-ticket-reopen-label" type="text" placeholder="Réouvrir">
+              </div>
+              <div class="form-group">
+                <label class="form-label">Libellé bouton transcript</label>
+                <input class="form-input" id="settings-ticket-transcript-label" type="text" placeholder="Transcript">
               </div>
               <div class="toggle-row">
                 <div class="toggle-info">
