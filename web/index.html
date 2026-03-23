@@ -309,15 +309,22 @@
       <p style="color:var(--text2);font-size:14px;margin-top:8px" data-i18n="payments_sub">Crypto automatique, PayPal ou carte cadeau — nous acceptons tout.</p>
       <div class="payment-methods">
         <div class="payment-pill">
-          <span class="pill-icon">₿</span>
+          <span class="pill-icon">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="10"></circle>
+              <path d="M12 6v12M9 15h6M9 9h6"></path>
+              <path d="M16 12l-4-4-4 4"></path>
+            </svg>
+          </span>
           <span data-i18n="payment_crypto">Crypto (OxaPay)</span>
           <span style="font-size:10px;color:var(--accent);font-family:'Space Mono',monospace;margin-left:4px" data-i18n="payment_crypto_status">AUTO</span>
         </div>
         <div class="payment-pill">
           <span class="pill-icon" aria-hidden="true">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M6 5h8a3 3 0 010 6H9v8H6z"></path>
-              <path d="M9 8h5"></path>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M18 5L6 19"></path>
+              <circle cx="9" cy="9" r="4"></circle>
+              <circle cx="15" cy="15" r="4"></circle>
             </svg>
           </span>
           <span data-i18n="payment_paypal">PayPal</span>
@@ -325,12 +332,10 @@
         </div>
         <div class="payment-pill">
           <span class="pill-icon" aria-hidden="true">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M20 12v8H4v-8"></path>
-              <path d="M12 4.5c0-1.4-1.2-2.5-2.6-2.5C7 2 6 3.2 6 4.6c0 1.2.8 2.2 1.8 2.4L12 8"></path>
-              <path d="M12 4.5c0-1.4 1.2-2.5 2.6-2.5C17 2 18 3.2 18 4.6c0 1.2-.8 2.2-1.8 2.4L12 8"></path>
-              <rect x="4" y="8" width="16" height="4"></rect>
-              <path d="M12 8v12"></path>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="3" y="8" width="18" height="12" rx="2"></rect>
+              <path d="M12 8V4M8 4h8M12 8l-4-4M12 8l4-4"></path>
+              <line x1="3" y1="12" x2="21" y2="12"></line>
             </svg>
           </span>
           <span data-i18n="payment_gift">Carte cadeau</span>
