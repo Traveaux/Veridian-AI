@@ -1521,13 +1521,17 @@ function renderKBEntries() {
 }
 
 function updateKBCounter() {
-  const limit = state.currentGuild?.tier === "pro" ? 100 : 50;
   const count = kbEntries.length;
+  const limit = kbLimit;
+  const limitLabel = limit == null ? "Illimité" : String(limit);
   const el = document.querySelector(".card-meta[data-kb-counter]");
-  if (el) el.textContent = `${count} / ${limit} ENTRÉES`;
+  if (el) el.textContent = `${count} / ${limitLabel} ENTRÉES`;
+  document.querySelectorAll("[data-kb-counter]").forEach((node) => {
+    node.textContent = `${count} / ${limitLabel}`;
+  });
   const fill = document.querySelector(".progress-fill[data-kb-fill]");
   if (fill) {
-    const pct = Math.min(100, Math.round((count / limit) * 100));
+    const pct = !limit ? 0 : Math.min(100, Math.round((count / limit) * 100));
     fill.style.width = pct + "%";
   }
 }
