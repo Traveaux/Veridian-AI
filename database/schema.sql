@@ -1,7 +1,7 @@
 -- ============================================================================
--- Schema MySQL complet pour Veridian AI v0.2
+-- Schema MySQL complet pour Veridian AI
 -- Toutes les tables sont prefixees 'vai_'
--- Mise a jour : nouvelles colonnes dashboard, KB CRUD, audit log, guild features
+-- Version de bootstrap compatible MySQL 9.x
 -- ============================================================================
 
 -- ============================================================================
@@ -31,6 +31,12 @@ CREATE TABLE IF NOT EXISTS vai_guilds (
     ticket_button_style      VARCHAR(20)   DEFAULT 'primary' COMMENT 'Style bouton: primary/secondary/danger/success',
     ticket_button_emoji      VARCHAR(50)                 COMMENT 'Emoji du bouton (optionnel)',
     ticket_welcome_message   TEXT                        COMMENT 'Message de bienvenue personnalise dans le ticket',
+    ticket_welcome_message_user TEXT                     COMMENT 'Template bienvenue cote utilisateur',
+    ticket_welcome_message_staff TEXT                    COMMENT 'Template bienvenue cote staff',
+    ticket_take_label        VARCHAR(100)  DEFAULT 'S''approprier le ticket' COMMENT 'Label bouton prise en charge',
+    ticket_close_label       VARCHAR(100)  DEFAULT 'Fermer le ticket' COMMENT 'Label bouton fermeture',
+    ticket_reopen_label      VARCHAR(100)  DEFAULT 'Réouvrir' COMMENT 'Label bouton reouverture',
+    ticket_transcript_label  VARCHAR(100)  DEFAULT 'Transcript' COMMENT 'Label bouton transcript',
     ticket_welcome_color     VARCHAR(10)   DEFAULT 'blue' COMMENT 'Couleur embed bienvenue: blue/green/red/yellow/purple',
     ticket_selector_enabled  TINYINT(1)    DEFAULT 0   COMMENT '1 = selecteur au lieu du bouton',
     ticket_selector_placeholder VARCHAR(200) DEFAULT 'Selectionnez le type de ticket',
@@ -69,7 +75,7 @@ CREATE TABLE IF NOT EXISTS vai_users (
 
 -- ============================================================================
 -- VAI_TICKETS - Tickets de support
--- Nouvelle colonne : assigned_staff_id, user_username pour affichage dashboard
+-- Colonnes dashboard + statuts ticket avances
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS vai_tickets (
@@ -79,12 +85,12 @@ CREATE TABLE IF NOT EXISTS vai_tickets (
     user_username       VARCHAR(100)                COMMENT 'Snapshot username au moment de louverture',
     channel_id          BIGINT          UNIQUE       COMMENT 'Channel Discord du ticket',
     initial_message_id  BIGINT                      COMMENT 'Message embed initial du ticket (pour mise a jour langue)',
-    status              ENUM('open','in_progress','closed') DEFAULT 'open',
+    status              ENUM('open','in_progress','pending_close','closed') DEFAULT 'open',
     user_language       VARCHAR(10),
     staff_language      VARCHAR(10)     DEFAULT 'en',
     assigned_staff_id   BIGINT,
     assigned_staff_name VARCHAR(100),
-    priority            ENUM('low','medium','high') DEFAULT 'medium',
+    priority            ENUM('low','medium','high','urgent') DEFAULT 'medium',
     close_reason        TEXT,
     transcript          LONGTEXT                    COMMENT 'Resume IA genere a la cloture',
     opened_at           TIMESTAMP       DEFAULT CURRENT_TIMESTAMP,
