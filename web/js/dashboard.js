@@ -86,9 +86,11 @@ function bindStaticActions() {
     const ticketBtn = e.target.closest("[data-ticket-action]");
     if (ticketBtn) {
       const ticketId = parseInt(ticketBtn.dataset.ticketId, 10);
+      const ticketStatus = ticketBtn.dataset.ticketStatus || "";
       if (!Number.isFinite(ticketId)) return;
       if (ticketBtn.dataset.ticketAction === "view") return void viewTicketTranscript(ticketId);
-      if (ticketBtn.dataset.ticketAction === "close") return void closeTicket(ticketId);
+      if (ticketBtn.dataset.ticketAction === "close") return void closeTicket(ticketId, ticketStatus);
+      if (ticketBtn.dataset.ticketAction === "reopen") return void reopenTicket(ticketId);
     }
 
     const orderBtn = e.target.closest("[data-order-action]");
@@ -781,8 +783,8 @@ function renderTickets(tickets) {
   }
 
   tbody.innerHTML = tickets.map((t) => {
-    const statusClass = { open: "pill pending", closed: "pill paid", "in_progress": "pill premium" }[t.status] || "pill";
-    const statusLabel = { open: "Ouvert", closed: "Fermé", in_progress: "En cours" }[t.status] || t.status;
+    const statusClass = { open: "pill pending", closed: "pill paid", "in_progress": "pill premium", "pending_close": "pill rejected" }[t.status] || "pill";
+    const statusLabel = { open: "Ouvert", closed: "Fermé", in_progress: "En cours", "pending_close": "En attente clôture" }[t.status] || t.status;
     const ts = new Date(t.opened_at).getTime();
     const date = !isNaN(ts) ? new Date(ts).toLocaleString("fr-FR") : (t.opened_at || "—");
     const priorityRaw = (t.priority || "medium").toLowerCase();
@@ -826,7 +828,8 @@ function renderTickets(tickets) {
           <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
           <span data-i18n="dash_view">Voir</span>
         </button>
-        ${t.status === "open" && Number.isFinite(tid) ? `<button class="btn btn-red btn-sm btn-xs" data-ticket-action="close" data-ticket-id="${tid}" type="button" style="margin-left:4px">Fermer</button>` : ""}
+        ${["open", "in_progress", "pending_close"].includes(t.status) && Number.isFinite(tid) ? `<button class="btn btn-red btn-sm btn-xs" data-ticket-action="close" data-ticket-id="${tid}" data-ticket-status="${escHtml(t.status || "")}" type="button" style="margin-left:4px">${t.status === "pending_close" ? "Confirmer" : "Demander fermeture"}</button>` : ""}
+        ${["pending_close", "closed"].includes(t.status) && Number.isFinite(tid) ? `<button class="btn btn-ghost btn-sm btn-xs" data-ticket-action="reopen" data-ticket-id="${tid}" type="button" style="margin-left:4px">Réouvrir</button>` : ""}
       </td>
     </tr>`;
   }).join("");
@@ -853,7 +856,9 @@ function initTicketSearch() {
       document.querySelectorAll("[data-ticket-filter]").forEach((b) => b.classList.remove("active"));
       btn.classList.add("active");
 
-      const filtered = ticketFilter === "all" ? allTickets : allTickets.filter((t) => t.status === ticketFilter);
+      const filtered = ticketFilter === "all"
+        ? allTickets
+        : allTickets.filter((t) => ticketFilter === "open" ? ["open", "pending_close"].includes(t.status) : t.status === ticketFilter);
       renderTickets(filtered);
     });
   });
@@ -1024,11 +1029,32 @@ async function updateTicketPriority(ticketId, priority, selectEl) {
   }
 }
 
-async function closeTicket(ticketId) {
-  if (!confirm(`Fermer le ticket #${ticketId} ?`)) return;
+async function closeTicket(ticketId, currentStatus = "") {
+  const normalizedStatus = String(currentStatus || "").toLowerCase();
+  const confirmMessage = normalizedStatus === "pending_close"
+    ? `Confirmer la clôture définitive du ticket #${ticketId} ?`
+    : `Passer le ticket #${ticketId} en attente de confirmation de clôture ?`;
+  if (!confirm(confirmMessage)) return;
   try {
-    await apiFetch(`/internal/ticket/${ticketId}/close`, { method: "POST", auth: true });
-    showToast(`Ticket #${ticketId} fermé`, "success");
+    const data = await apiFetch(`/internal/ticket/${ticketId}/close`, { method: "POST", auth: true });
+    if (data.ticket_status === "pending_close") {
+      showToast(`Ticket #${ticketId} en attente de confirmation`, "info");
+    } else if (data.ticket_status === "closed") {
+      showToast(`Ticket #${ticketId} fermé`, "success");
+    } else {
+      showToast(`Action appliquée sur le ticket #${ticketId}`, "success");
+    }
+    loadTickets();
+  } catch (e) {
+    showToast("Erreur: " + e.message, "error");
+  }
+}
+
+async function reopenTicket(ticketId) {
+  if (!confirm(`Réouvrir le ticket #${ticketId} ?`)) return;
+  try {
+    await apiFetch(`/internal/ticket/${ticketId}/reopen`, { method: "POST", auth: true });
+    showToast(`Ticket #${ticketId} réouvert`, "success");
     loadTickets();
   } catch (e) {
     showToast("Erreur: " + e.message, "error");
