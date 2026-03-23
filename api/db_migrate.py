@@ -143,7 +143,7 @@ def _column_info(table_name: str, column_name: str) -> dict | None:
         cursor = conn.cursor(dictionary=True)
         cursor.execute(
             """
-            SELECT column_name, data_type, character_maximum_length
+            SELECT column_name, data_type, column_type, column_default, character_maximum_length
             FROM information_schema.columns
             WHERE table_schema = DATABASE()
               AND table_name = %s
@@ -309,6 +309,54 @@ def _ensure_ticket_migrations() -> None:
                     if "duplicate column" not in str(e).lower():
                         logger.warning(f"[db] ALTER {tickets_table}.priority: {e}")
 
+        # Harmonise status pour supporter pending_close sur les bases existantes.
+        status_info = _column_info(tickets_table, "status")
+        status_type = ((status_info or {}).get("column_type") or "").lower()
+        if status_info and ("enum(" not in status_type or "pending_close" not in status_type):
+            with get_db_context() as conn:
+                cursor = conn.cursor()
+                try:
+                    cursor.execute(
+                        f"UPDATE {tickets_table} "
+                        f"SET status = 'open' "
+                        f"WHERE status IS NULL OR status NOT IN ('open','in_progress','pending_close','closed')"
+                    )
+                    cursor.execute(
+                        f"ALTER TABLE {tickets_table} "
+                        f"MODIFY COLUMN status ENUM('open','in_progress','pending_close','closed') DEFAULT 'open'"
+                    )
+                    logger.info(f"[db] Colonne status harmonisee sur {tickets_table}")
+                except Exception as e:
+                    logger.warning(f"[db] ALTER {tickets_table}.status enum: {e}")
+
+        # Harmonise priority pour supporter urgent et normaliser les anciennes valeurs.
+        priority_info = _column_info(tickets_table, "priority")
+        priority_type = ((priority_info or {}).get("column_type") or "").lower()
+        if priority_info and ("enum(" not in priority_type or "urgent" not in priority_type):
+            with get_db_context() as conn:
+                cursor = conn.cursor()
+                try:
+                    cursor.execute(
+                        f"""
+                        UPDATE {tickets_table}
+                        SET priority = CASE
+                            WHEN priority IS NULL OR TRIM(priority) = '' THEN 'medium'
+                            WHEN LOWER(priority) IN ('low', 'bas', 'basse') THEN 'low'
+                            WHEN LOWER(priority) IN ('medium', 'moyen', 'moyenne') THEN 'medium'
+                            WHEN LOWER(priority) IN ('high', 'haut', 'haute', 'eleve') THEN 'high'
+                            WHEN LOWER(priority) IN ('urgent', 'prioritaire') THEN 'urgent'
+                            ELSE 'medium'
+                        END
+                        """
+                    )
+                    cursor.execute(
+                        f"ALTER TABLE {tickets_table} "
+                        f"MODIFY COLUMN priority ENUM('low','medium','high','urgent') DEFAULT 'medium'"
+                    )
+                    logger.info(f"[db] Colonne priority harmonisee sur {tickets_table}")
+                except Exception as e:
+                    logger.warning(f"[db] ALTER {tickets_table}.priority enum: {e}")
+
     msgs_table = f"{DB_TABLE_PREFIX}ticket_messages"
     if _table_exists(msgs_table):
         if _column_info(msgs_table, "author_username") is None:
@@ -373,6 +421,12 @@ def _ensure_guild_v04_migrations() -> None:
         "ticket_button_style":        "VARCHAR(20) DEFAULT 'primary'",
         "ticket_button_emoji":        "VARCHAR(50) NULL",
         "ticket_welcome_message":     "TEXT NULL COMMENT 'Message bienvenue personnalise'",
+        "ticket_welcome_message_user": "TEXT NULL COMMENT 'Message bienvenue personnalise cote utilisateur'",
+        "ticket_welcome_message_staff": "TEXT NULL COMMENT 'Message bienvenue personnalise cote staff'",
+        "ticket_take_label":          "VARCHAR(100) DEFAULT 'S''approprier le ticket'",
+        "ticket_close_label":         "VARCHAR(100) DEFAULT 'Fermer le ticket'",
+        "ticket_reopen_label":        "VARCHAR(100) DEFAULT 'Réouvrir'",
+        "ticket_transcript_label":    "VARCHAR(100) DEFAULT 'Transcript'",
         "ticket_welcome_color":       "VARCHAR(10) DEFAULT 'blue'",
         "ticket_selector_enabled":    "TINYINT(1) DEFAULT 0",
         "ticket_selector_placeholder": "VARCHAR(200) DEFAULT 'Selectionnez le type de ticket'",

@@ -368,10 +368,17 @@ SELECT
 -- ALTER TABLE vai_guilds ADD COLUMN IF NOT EXISTS ai_moderation   TINYINT(1) DEFAULT 0;
 -- ALTER TABLE vai_guilds ADD COLUMN IF NOT EXISTS staff_suggestions TINYINT(1) DEFAULT 0;
 -- ALTER TABLE vai_guilds ADD COLUMN IF NOT EXISTS welcome_channel_id BIGINT;
+-- ALTER TABLE vai_guilds ADD COLUMN IF NOT EXISTS ticket_welcome_message_user TEXT;
+-- ALTER TABLE vai_guilds ADD COLUMN IF NOT EXISTS ticket_welcome_message_staff TEXT;
+-- ALTER TABLE vai_guilds ADD COLUMN IF NOT EXISTS ticket_take_label VARCHAR(100) DEFAULT 'S''approprier le ticket';
+-- ALTER TABLE vai_guilds ADD COLUMN IF NOT EXISTS ticket_close_label VARCHAR(100) DEFAULT 'Fermer le ticket';
+-- ALTER TABLE vai_guilds ADD COLUMN IF NOT EXISTS ticket_reopen_label VARCHAR(100) DEFAULT 'Réouvrir';
+-- ALTER TABLE vai_guilds ADD COLUMN IF NOT EXISTS ticket_transcript_label VARCHAR(100) DEFAULT 'Transcript';
 -- ALTER TABLE vai_guilds ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP;
 -- ALTER TABLE vai_tickets ADD COLUMN IF NOT EXISTS user_username VARCHAR(100);
 -- ALTER TABLE vai_tickets ADD COLUMN IF NOT EXISTS assigned_staff_name VARCHAR(100);
--- ALTER TABLE vai_tickets MODIFY COLUMN status ENUM('open','in_progress','closed') DEFAULT 'open';
+-- ALTER TABLE vai_tickets MODIFY COLUMN status ENUM('open','in_progress','pending_close','closed') DEFAULT 'open';
+-- ALTER TABLE vai_tickets MODIFY COLUMN priority ENUM('low','medium','high','urgent') DEFAULT 'medium';
 -- ALTER TABLE vai_orders ADD COLUMN IF NOT EXISTS user_username VARCHAR(100);
 -- ALTER TABLE vai_orders ADD COLUMN IF NOT EXISTS guild_name VARCHAR(100);
 -- ALTER TABLE vai_orders ADD COLUMN IF NOT EXISTS validated_by BIGINT;
