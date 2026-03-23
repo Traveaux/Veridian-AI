@@ -639,7 +639,10 @@ function buildLast7DaysSeries(dailyCounts) {
 
 function setStatValue(id, value) {
   const el = document.getElementById(id);
-  if (el) el.textContent = value;
+  if (el) {
+    if (String(value).includes("<svg")) el.innerHTML = value;
+    else el.textContent = value;
+  }
 }
 
 // ─────────────────────────────────────────────────────────────────
