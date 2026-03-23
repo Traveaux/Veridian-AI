@@ -33,8 +33,8 @@ PLAN_LIMITS = {
     "free": {
         "tickets_per_month": 50,
         "languages":         5,
-        "kb_entries":        0,
-        "features":          ["tickets", "public_support"]
+        "kb_entries":        10,
+        "features":          ["tickets", "public_support", "knowledge_base"]
     },
     "premium": {
         "tickets_per_month": 500,
