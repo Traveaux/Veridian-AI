@@ -1483,6 +1483,7 @@ function initSettingsSave() {
 // ─────────────────────────────────────────────────────────────
 
 let kbEntries = [];
+let kbLimit = 0;
 
 async function loadKB() {
   if (!state.currentGuild) return;
@@ -1491,6 +1492,7 @@ async function loadKB() {
   try {
     const data = await apiFetch(`/internal/guild/${guildId}/kb`, { auth: true });
     kbEntries = data.entries || [];
+    kbLimit = data.limit ?? 0;
     renderKBEntries();
     updateKBCounter();
   } catch (e) {
