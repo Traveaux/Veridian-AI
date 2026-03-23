@@ -284,7 +284,7 @@ function renderDashboard() {
   const u = state.user;
   if (u) {
     document.querySelector(".user-name").textContent = u.username || "—";
-    document.querySelector(".user-role").textContent = isSuper ? "Super Admin 👑" : "Admin Serveur";
+    document.querySelector(".user-role").innerHTML = isSuper ? 'Super Admin <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--yellow)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-left:2px"><path d="M2 4l3 12h14l3-12-6 7-4-7-4 7-6-7z"></path></svg>' : "Admin Serveur";
     const avatarImg = document.querySelector(".user-avatar-img");
     if (avatarImg && u.avatar) avatarImg.src = u.avatar;
   }
@@ -682,7 +682,9 @@ async function loadBotStatus() {
     }
 
     // ── Dashboard page: bot status cards ──
-    setStatValue("dash-bot-status", b.is_online ? "✅ En ligne" : "❌ Hors ligne");
+    setStatValue("dash-bot-status", b.is_online ? '<span style="color:var(--accent);display:inline-flex;align-items:center;gap:4px"><svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"></circle></svg> En ligne</span>' : '<span style="color:var(--red);display:inline-flex;align-items:center;gap:4px"><svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"></circle></svg> Hors ligne</span>');
+    // We need to update setStatValue to support HTML
+
     setStatValue("dash-bot-latency", `Latence: ${b.latency_ms}ms`);
     setStatValue("dash-bot-guilds", b.guild_count ?? "—");
     setStatValue("dash-bot-users", `${b.user_count ?? 0} utilisateurs`);
@@ -705,12 +707,13 @@ async function loadBotStatus() {
     const txt = document.getElementById("bot-status-text");
     if (indicator) { indicator.classList.remove("offline"); indicator.classList.add("unknown"); }
     if (txt) txt.textContent = "STATUT INCONNU";
-    setStatValue("dash-bot-status", "⚠️ Inconnu");
+    setStatValue("dash-bot-status", '<span style="color:var(--yellow);display:inline-flex;align-items:center;gap:4px"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg> Inconnu</span>');
     console.warn("Bot status:", e.message);
   }
 }
 
-const LANG_FLAGS = { en: "🇬🇧", fr: "🇫🇷", de: "🇩🇪", es: "🇪🇸", ru: "🇷🇺", ja: "🇯🇵", zh: "🇨🇳", pt: "🇵🇹", it: "🇮🇹" };
+const LANG_SVG = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:0.8"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>`;
+const LANG_FLAGS = { en: LANG_SVG, fr: LANG_SVG, de: LANG_SVG, es: LANG_SVG, ru: LANG_SVG, ja: LANG_SVG, zh: LANG_SVG, pt: LANG_SVG, it: LANG_SVG };
 const LANG_NAMES = { en: "Anglais", fr: "Français", de: "Allemand", es: "Espagnol", ru: "Russe", ja: "Japonais", zh: "Chinois", pt: "Portugais", it: "Italien" };
 
 function renderLanguageStats(languages) {
@@ -819,7 +822,10 @@ function renderTickets(tickets) {
       <td>${escHtml(t.assigned_staff_name || "—")}</td>
       <td class="mono-grey">${date}</td>
       <td>
-        <button class="btn btn-ghost btn-sm btn-xs" data-ticket-action="view" data-ticket-id="${Number.isFinite(tid) ? tid : ""}" type="button">📄 Voir</button>
+        <button class="btn btn-ghost btn-sm btn-xs" data-ticket-action="view" data-ticket-id="${Number.isFinite(tid) ? tid : ""}" type="button" style="display:inline-flex;align-items:center;gap:4px">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg>
+          <span data-i18n="dash_view">Voir</span>
+        </button>
         ${t.status === "open" && Number.isFinite(tid) ? `<button class="btn btn-red btn-sm btn-xs" data-ticket-action="close" data-ticket-id="${tid}" type="button" style="margin-left:4px">Fermer</button>` : ""}
       </td>
     </tr>`;
@@ -1056,7 +1062,11 @@ function renderOrders(orders, containerId = "orders-list") {
     return `
     <div class="order-card" data-order-key="${escAttr(orderKey)}">
       <div class="order-method-icon ${o.method === 'paypal' ? 'paypal' : o.method === 'giftcard' ? 'giftcard' : 'oxapay'}">
-        ${o.method === 'paypal' ? '💳' : o.method === 'giftcard' ? '🎁' : '🔐'}
+        ${o.method === 'paypal' 
+          ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"></rect><line x1="1" y1="10" x2="23" y2="10"></line></svg>` 
+          : o.method === 'giftcard' 
+            ? `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px"><polyline points="20 12 20 22 4 22 4 12"></polyline><rect x="2" y="7" width="20" height="5"></rect><line x1="12" y1="22" x2="12" y2="7"></line><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"></path><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"></path></svg>` 
+            : `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>`}
       </div>
       <div class="order-info">
         <div class="order-id">${escHtml(orderKey)}</div>
@@ -1725,9 +1735,16 @@ function showToast(message, type = "info") {
     display:flex;align-items:center;gap:8px;
     animation:slideIn .2s ease;max-width:320px;
   `;
-  toast.innerHTML = `<span style="color:${colors[type]};font-size:16px">
-    ${{ success: "✅", error: "❌", warn: "⚠️", info: "ℹ️" }[type]}
-  </span> ${escHtml(message)}`;
+  const icons = {
+    success: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`,
+    error: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`,
+    warn: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>`,
+    info: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>`
+  };
+
+  toast.innerHTML = `<span style="color:${colors[type]};display:flex;align-items:center">
+    ${icons[type] || icons.info}
+  </span> <span>${escHtml(message)}</span>`;
 
   container.appendChild(toast);
   setTimeout(() => {
