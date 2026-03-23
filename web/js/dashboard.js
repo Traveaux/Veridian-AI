@@ -1573,6 +1573,10 @@ async function saveKBEntry() {
     document.getElementById("kb-form").style.display = "none";
     await loadKB();
   } catch (e) {
+    if (e.status === 403) {
+      showToast(e.message || "Limite KB atteinte pour ce plan", "warn");
+      return;
+    }
     showToast("Erreur: " + e.message, "error");
   }
 }
