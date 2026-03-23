@@ -14,6 +14,7 @@ from bot.db.models import (
     AuditLogModel, GuildModel, TicketModel, BotStatusModel,
     PendingNotificationModel, KnowledgeBaseModel
 )
+from bot.db.connection import get_db_context, DB_TABLE_PREFIX
 from bot.config import PLAN_LIMITS, PRICING
 from api.routes.internal import verify_super_admin
 
@@ -260,32 +261,84 @@ async def revoke_subscription(
 async def get_global_stats(auth: dict = Depends(verify_super_admin)):
     """Retourne les statistiques globales du bot pour le super-admin."""
     try:
-        from bot.db.connection import get_db_context
         with get_db_context() as conn:
-            cursor = conn.cursor(dictionary=True)
-            
-            # 1. Revenu total
-            cursor.execute("SELECT SUM(amount) as total FROM vai_payments WHERE status = 'completed'")
-            revenue = cursor.fetchone()["total"] or 0
-            
-            # 2. Tickets totaux (ce mois)
-            cursor.execute("SELECT COUNT(*) as total FROM vai_tickets WHERE opened_at > DATE_SUB(NOW(), INTERVAL 30 DAY)")
-            tickets_month = cursor.fetchone()["total"] or 0
-            
-            # 3. Serveurs actifs
-            cursor.execute("SELECT COUNT(*) as total FROM vai_guilds")
-            guilds_total = cursor.fetchone()["total"] or 0
-            
-            # 4. Abonnements actifs
-            cursor.execute("SELECT COUNT(*) as total FROM vai_subscriptions WHERE expires_at > NOW()")
-            subs_active = cursor.fetchone()["total"] or 0
-            
+            cursor = conn.cursor()
+
+            def scalar(query: str, params: tuple = ()) -> float | int:
+                cursor.execute(query, params)
+                row = cursor.fetchone()
+                return 0 if not row else row[0]
+
+            revenue_total = float(scalar(
+                f"SELECT COALESCE(SUM(amount), 0) "
+                f"FROM {DB_TABLE_PREFIX}payments "
+                f"WHERE status = 'completed'"
+            ))
+            revenue_month = float(scalar(
+                f"SELECT COALESCE(SUM(amount), 0) "
+                f"FROM {DB_TABLE_PREFIX}payments "
+                f"WHERE status = 'completed' "
+                f"AND YEAR(paid_at) = YEAR(CURDATE()) "
+                f"AND MONTH(paid_at) = MONTH(CURDATE())"
+            ))
+            tickets_month = int(scalar(
+                f"SELECT COUNT(*) "
+                f"FROM {DB_TABLE_PREFIX}tickets "
+                f"WHERE opened_at > DATE_SUB(NOW(), INTERVAL 30 DAY)"
+            ))
+            tickets_today = int(scalar(
+                f"SELECT COUNT(*) "
+                f"FROM {DB_TABLE_PREFIX}tickets "
+                f"WHERE DATE(opened_at) = CURDATE()"
+            ))
+            guilds_total = int(scalar(f"SELECT COUNT(*) FROM {DB_TABLE_PREFIX}guilds"))
+            subs_active = int(scalar(
+                f"SELECT COUNT(*) "
+                f"FROM {DB_TABLE_PREFIX}subscriptions "
+                f"WHERE is_active = 1"
+            ))
+            orders_pending = int(scalar(
+                f"SELECT COUNT(*) "
+                f"FROM {DB_TABLE_PREFIX}orders "
+                f"WHERE status = 'pending'"
+            ))
+
+            dashboard_users_count = None
+            session_users_count = None
+            try:
+                dashboard_users_count = int(scalar(f"SELECT COUNT(*) FROM {DB_TABLE_PREFIX}dashboard_users"))
+            except Exception:
+                pass
+
+            try:
+                session_users_count = int(scalar(
+                    f"SELECT COUNT(DISTINCT discord_user_id) FROM {DB_TABLE_PREFIX}dashboard_sessions"
+                ))
+            except Exception:
+                pass
+
+            if dashboard_users_count is not None:
+                total_users = max(dashboard_users_count, session_users_count or 0)
+            elif session_users_count is not None:
+                total_users = session_users_count
+            else:
+                total_users = int(scalar(f"SELECT COUNT(*) FROM {DB_TABLE_PREFIX}users"))
+
+            bot_status = BotStatusModel.get() or {}
+
             return {
-                "revenue_total": float(revenue),
+                "total_guilds": guilds_total,
+                "total_users": total_users,
+                "tickets_today": tickets_today,
+                "revenue_month": revenue_month,
+                "active_subs": subs_active,
+                "orders_pending": orders_pending,
+                "bot_version": bot_status.get("version", "Unknown"),
+                # Compatibilite avec les anciennes cles potentiellement deja consommees.
+                "revenue_total": revenue_total,
                 "tickets_month": tickets_month,
                 "guilds_total": guilds_total,
                 "subscriptions_active": subs_active,
-                "bot_version": BotStatusModel.get(1).get("version", "Unknown") if BotStatusModel.get(1) else "Unknown"
             }
     except Exception as e:
         logger.error(f"Erreur get_global_stats: {e}")
