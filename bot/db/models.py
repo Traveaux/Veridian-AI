@@ -183,7 +183,7 @@ class TicketModel:
             cursor = conn.cursor()
             cursor.execute(
                 f"SELECT COUNT(*) FROM {DB_TABLE_PREFIX}tickets "
-                f"WHERE guild_id = %s AND user_id = %s AND status IN ('open','in_progress')",
+                f"WHERE guild_id = %s AND user_id = %s AND status IN ('open','in_progress','pending_close')",
                 (guild_id, user_id),
             )
             return int(cursor.fetchone()[0] or 0)
@@ -313,7 +313,7 @@ class TicketModel:
                     FROM {DB_TABLE_PREFIX}ticket_messages
                     GROUP BY ticket_id
                 ) m ON t.id = m.ticket_id
-                WHERE t.status IN ('open', 'in_progress')
+                WHERE t.status IN ('open', 'in_progress', 'pending_close')
                 AND (
                     (m.last_msg IS NULL AND t.opened_at < DATE_SUB(NOW(), INTERVAL %s DAY))
                     OR (m.last_msg IS NOT NULL AND m.last_msg < DATE_SUB(NOW(), INTERVAL %s DAY))
