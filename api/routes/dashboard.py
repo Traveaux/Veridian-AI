@@ -55,7 +55,7 @@ class KBEntryUpdateRequest(BaseModel):
 async def get_pending_orders(auth: dict = Depends(verify_super_admin)):
     """Liste toutes les commandes en attente de validation."""
     try:
-        orders = OrderModel.get_pending()
+        orders = OrderModel.list_pending()
         return {"total": len(orders), "orders": orders}
     except Exception as e:
         logger.error(f"Erreur get_pending_orders: {e}")
