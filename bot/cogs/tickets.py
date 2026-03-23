@@ -3,12 +3,17 @@ Cog: Tickets - Gestion des tickets de support avec traduction en temps reel.
 La configuration du systeme (category, staff role, etc.) se fait via le dashboard.
 """
 
+import asyncio
 import discord
 from discord.ext import commands, tasks
 from loguru import logger
+import io
 import json
+from datetime import datetime
 
 from bot.db.models import TicketModel, GuildModel, UserModel, TicketMessageModel
+from bot.db.connection import get_db_context
+from bot.config import DB_TABLE_PREFIX
 from bot.services.translator import TranslatorService
 from bot.services.groq_client import GroqClient
 from bot.config import TICKET_CHANNEL_PREFIX, BOT_OWNER_DISCORD_ID
@@ -71,6 +76,123 @@ def _embed_color(raw: str | None) -> discord.Color:
         "yellow": discord.Color.gold(),
         "purple": discord.Color.purple(),
     }.get(n, discord.Color.blue())
+
+
+WELCOME_TEXTS = {
+    "en": {
+        "user": "Hello {user_mention}, describe your issue below. We will translate the conversation and get back to you shortly.",
+        "staff": "Staff note: reply in {staff_language}. Current owner: {assigned_staff}.",
+    },
+    "fr": {
+        "user": "Bonjour {user_mention}, décrivez votre problème ci-dessous. Nous traduirons l'échange et le staff reviendra vers vous rapidement.",
+        "staff": "Note staff : répondez en {staff_language}. Ticket actuellement pris par : {assigned_staff}.",
+    },
+    "es": {
+        "user": "Hola {user_mention}, describe tu problema abajo. Traduciremos la conversación y el staff responderá pronto.",
+        "staff": "Nota para el staff: responded en {staff_language}. Ticket asignado a: {assigned_staff}.",
+    },
+    "de": {
+        "user": "Hallo {user_mention}, beschreibe dein Problem unten. Wir übersetzen den Verlauf und das Team antwortet dir bald.",
+        "staff": "Hinweis fürs Team: Antwortet auf {staff_language}. Aktuell zugewiesen an: {assigned_staff}.",
+    },
+    "it": {
+        "user": "Ciao {user_mention}, descrivi il tuo problema qui sotto. Tradurremo la conversazione e lo staff ti risponderà presto.",
+        "staff": "Nota staff: rispondere in {staff_language}. Ticket assegnato a: {assigned_staff}.",
+    },
+    "pt": {
+        "user": "Olá {user_mention}, descreva o seu problema abaixo. Vamos traduzir a conversa e a equipa responderá em breve.",
+        "staff": "Nota da equipa: responder em {staff_language}. Ticket atribuído a: {assigned_staff}.",
+    },
+}
+
+
+def _normalize_lang(code: str | None, fallback: str = "en") -> str:
+    raw = (code or "").strip().lower()
+    if not raw or raw == "auto":
+        return fallback
+    return raw[:2]
+
+
+def _status_label(status: str | None) -> str:
+    return {
+        "open": "Ouvert",
+        "in_progress": "En cours",
+        "pending_close": "En attente de clôture",
+        "closed": "Fermé",
+    }.get((status or "open").strip().lower(), status or "Ouvert")
+
+
+def _render_template(template: str, variables: dict[str, str]) -> str:
+    out = str(template or "")
+    for key, value in variables.items():
+        out = out.replace(f"{{{key}}}", str(value))
+    return out
+
+
+def _truncate_block(text: str, limit: int = 1024) -> str:
+    text = (text or "").strip()
+    if len(text) <= limit:
+        return text or "—"
+    return text[: limit - 1].rstrip() + "…"
+
+
+def _format_duration_short(total_seconds: float | int | None) -> str:
+    secs = max(0, int(total_seconds or 0))
+    days, rem = divmod(secs, 86400)
+    hours, rem = divmod(rem, 3600)
+    minutes, seconds = divmod(rem, 60)
+    parts = []
+    if days:
+        parts.append(f"{days}j")
+    if hours:
+        parts.append(f"{hours}h")
+    if minutes:
+        parts.append(f"{minutes}m")
+    if not parts:
+        parts.append(f"{seconds}s")
+    return " ".join(parts[:3])
+
+
+def _compute_ticket_metrics(ticket: dict, messages: list[dict]) -> dict[str, str | None]:
+    user_id = int(ticket.get("user_id") or 0)
+    pending_user_at: datetime | None = None
+    response_deltas: list[float] = []
+
+    for msg in messages or []:
+        sent_at = msg.get("sent_at")
+        if not isinstance(sent_at, datetime):
+            continue
+        author_id = int(msg.get("author_id") or 0)
+        if author_id == user_id:
+            if pending_user_at is None:
+                pending_user_at = sent_at
+            continue
+        if pending_user_at is not None:
+            delta = (sent_at - pending_user_at).total_seconds()
+            if delta >= 0:
+                response_deltas.append(delta)
+            pending_user_at = None
+
+    opened_at = ticket.get("opened_at")
+    closed_at = ticket.get("closed_at") or datetime.utcnow()
+    open_duration = None
+    if isinstance(opened_at, datetime) and isinstance(closed_at, datetime):
+        open_duration = max(0, (closed_at - opened_at).total_seconds())
+
+    avg_response = None
+    if response_deltas:
+        avg_response = sum(response_deltas) / len(response_deltas)
+
+    return {
+        "avg_response": _format_duration_short(avg_response) if avg_response is not None else None,
+        "open_duration": _format_duration_short(open_duration) if open_duration is not None else None,
+    }
+
+
+def _safe_filename_part(value: str | None, fallback: str) -> str:
+    raw = "".join(ch if ch.isalnum() or ch in {"-", "_"} else "-" for ch in str(value or fallback).strip().lower())
+    clean = raw.strip("-_")
+    return clean or fallback
 
 
 class TicketsCog(commands.Cog):
@@ -207,35 +329,57 @@ class TicketsCog(commands.Cog):
             logger.error(f"Erreur on_member_remove ticket cleanup: {e}")
 
     def _build_ticket_welcome_embed(self, *, ticket_id: int,
+                                   user_id: int | None,
                                    user_language: str | None,
                                    staff_language: str | None,
                                    guild_config: dict | None = None,
-                                   priority: str | None = None) -> discord.Embed:
+                                   priority: str | None = None,
+                                   status: str | None = None,
+                                   assigned_staff_name: str | None = None) -> discord.Embed:
         def fmt_lang(code: str | None, pending_label: str) -> str:
             if not code or code == "auto":
                 return pending_label
             return get_lang_name(code)
 
-        ul = fmt_lang(user_language, "Détection en cours…")
-        sl = fmt_lang(staff_language, "AUTO")
+        ul = fmt_lang(user_language, "English")
+        sl = fmt_lang(staff_language, "English")
+        assigned_label = assigned_staff_name or "Non assigné"
+        status_text = _status_label(status)
 
         cfg = guild_config or {}
-        custom_desc = (cfg.get("ticket_welcome_message") or "").strip()
-        if not custom_desc:
-            custom_desc = (
-                "Bienvenue ! Décrivez votre problème ci-dessous.\n"
-                "Le bot détectera votre langue à partir de votre premier message.\n"
-                "Un membre du staff vous répondra bientôt."
-            )
+        variables = {
+            "ticket_id": f"#{ticket_id}",
+            "user_mention": f"<@{user_id}>" if user_id else "l'utilisateur",
+            "user_language": ul,
+            "staff_language": sl,
+            "assigned_staff": assigned_label,
+            "status": status_text,
+        }
+
+        legacy_template = (cfg.get("ticket_welcome_message") or "").strip()
+        user_template = (
+            (cfg.get("ticket_welcome_message_user") or "").strip()
+            or legacy_template
+            or WELCOME_TEXTS.get(_normalize_lang(user_language), WELCOME_TEXTS["en"])["user"]
+        )
+        staff_template = (
+            (cfg.get("ticket_welcome_message_staff") or "").strip()
+            or legacy_template
+            or WELCOME_TEXTS.get(_normalize_lang(staff_language), WELCOME_TEXTS["en"])["staff"]
+        )
 
         embed = discord.Embed(
             title="Ticket de Support",
             color=_embed_color(cfg.get("ticket_welcome_color")),
-            description=custom_desc,
+            description="Le ticket est prêt. Utilisez les boutons ci-dessous pour l’assignation, la transcription et la clôture.",
         )
+        embed.add_field(name="Message utilisateur", value=_truncate_block(_render_template(user_template, variables)), inline=False)
+        embed.add_field(name="Note staff", value=_truncate_block(_render_template(staff_template, variables)), inline=False)
         embed.add_field(name="Ticket ID", value=f"`{ticket_id}`", inline=True)
         embed.add_field(name="Langue utilisateur", value=f"`{ul}`", inline=True)
         embed.add_field(name="Langue staff", value=f"`{sl}`", inline=True)
+        embed.add_field(name="Statut", value=f"`{status_text}`", inline=True)
+        embed.add_field(name="Assigné à", value=f"`{assigned_label}`", inline=True)
         # Priorité du ticket (bas / moyen / haut / prioritaire)
         pr_raw = (priority or "medium").strip().lower()
         pr_label = {
@@ -250,7 +394,7 @@ class TicketsCog(commands.Cog):
         intent = (cfg.get("last_analysis") or "").strip()
         if intent:
             embed.add_field(name="Analyse IA", value=f"*{intent}*", inline=False)
-            
+
         return embed
 
     async def _try_update_welcome_embed(self, channel: discord.TextChannel, ticket_id: int):
@@ -662,12 +806,15 @@ class TicketsCog(commands.Cog):
         # Message de bienvenue
         embed = self._build_ticket_welcome_embed(
             ticket_id=ticket_id,
+            user_id=interaction.user.id,
             user_language=user_language,
             staff_language=staff_language,
             guild_config=guild_config,
             priority="medium",
+            status="open",
+            assigned_staff_name=None,
         )
-        view = TicketCloseView(ticket_id, self.bot)
+        view = TicketControlView(ticket_id, self.bot)
         welcome_msg = await ticket_channel.send(embed=embed, view=view)
 
         # Mention staff role if enabled
