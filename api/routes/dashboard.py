@@ -14,8 +14,8 @@ from bot.db.models import (
     AuditLogModel, GuildModel, TicketModel, BotStatusModel,
     PendingNotificationModel, KnowledgeBaseModel
 )
-from bot.db.connection import get_db_context, DB_TABLE_PREFIX
-from bot.config import PLAN_LIMITS, PRICING
+from bot.db.connection import get_db_context
+from bot.config import PLAN_LIMITS, PRICING, DB_TABLE_PREFIX
 from api.routes.internal import verify_super_admin
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
