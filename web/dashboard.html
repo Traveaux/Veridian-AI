@@ -43,6 +43,57 @@
   </div>
 </div>
 
+<div id="billing-modal" class="dashboard-modal" aria-hidden="true">
+  <div class="dashboard-modal-panel">
+    <div class="dashboard-modal-header">
+      <div>
+        <div class="dashboard-modal-title" data-i18n="dash_billing_modal_title">Abonnement</div>
+        <div class="dashboard-modal-sub" data-i18n="dash_billing_modal_sub">Consultez rapidement les plans et les moyens de paiement sans quitter le dashboard.</div>
+      </div>
+      <button class="dashboard-modal-close" data-action="close-billing-modal" type="button" aria-label="Fermer" data-i18n-aria-label="dash_close">×</button>
+    </div>
+    <div class="billing-modal-tabs">
+      <button class="billing-modal-tab active" data-billing-modal-tab="plans" type="button" data-i18n="dash_view_plans">Voir les plans</button>
+      <button class="billing-modal-tab" data-billing-modal-tab="payments" type="button" data-i18n="dash_view_payment_methods">Voir les paiements</button>
+    </div>
+    <div class="billing-modal-body">
+      <div class="billing-modal-view active" data-billing-modal-view="plans">
+        <div class="billing-info-grid">
+          <div class="billing-info-card">
+            <div class="billing-plan-name">Premium</div>
+            <div class="billing-plan-price">2€<span>/mois</span></div>
+            <p data-i18n="plan_premium_desc">Pour les communautés actives avec un support international.</p>
+          </div>
+          <div class="billing-info-card featured">
+            <div class="billing-plan-name">Pro</div>
+            <div class="billing-plan-price">5€<span>/mois</span></div>
+            <p data-i18n="plan_pro_desc">Pour les serveurs à fort volume avec des besoins avancés.</p>
+          </div>
+        </div>
+      </div>
+      <div class="billing-modal-view" data-billing-modal-view="payments">
+        <div class="billing-info-grid">
+          <div class="billing-info-card">
+            <div class="billing-method-title" data-i18n="payment_crypto">Crypto (OxaPay)</div>
+            <div class="billing-method-meta" data-i18n="payment_methods">BTC · ETH · USDT · LTC et plus via OxaPay</div>
+            <span class="pill paid" data-i18n="payment_crypto_status">AUTO</span>
+          </div>
+          <div class="billing-info-card">
+            <div class="billing-method-title" data-i18n="payment_paypal">PayPal</div>
+            <div class="billing-method-meta" data-i18n="dash_payment_paypal_desc">Validation manuelle par l'équipe admin</div>
+            <span class="pill pending" data-i18n="payment_paypal_status">MANUEL</span>
+          </div>
+          <div class="billing-info-card">
+            <div class="billing-method-title" data-i18n="payment_gift">Carte cadeau</div>
+            <div class="billing-method-meta" data-i18n="dash_payment_gift_desc">Validation manuelle après vérification du code</div>
+            <span class="pill pending" data-i18n="payment_gift_status">MANUEL</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ══ LOGIN SCREEN ════════════════════════════════════════════ -->
 <div id="login-screen" style="display:none;position:fixed;inset:0;background:var(--bg);
      z-index:9999;flex-direction:column;align-items:center;justify-content:center;gap:20px;">
@@ -404,62 +455,68 @@
               <span class="pill free" id="billing-current-status" data-i18n="dash_loading">Chargement…</span>
             </div>
             <p class="billing-note" id="billing-plan-note" data-i18n="dash_billing_note">
-              Choisissez un plan sur le site puis utilisez le moyen de paiement qui vous convient.
+              Choisissez un plan et un moyen de paiement directement depuis cette page.
             </p>
             <div style="display:flex;gap:8px;flex-wrap:wrap">
-              <a class="btn btn-primary btn-sm" href="index.html#pricing" data-i18n="dash_view_plans">Voir les plans</a>
-              <a class="btn btn-ghost btn-sm" href="index.html#payments" data-i18n="dash_view_payment_methods">Voir les paiements</a>
+              <button class="btn btn-primary btn-sm" data-action="open-billing-modal" data-billing-view="plans" data-i18n="dash_view_plans" type="button">Voir les plans</button>
+              <button class="btn btn-ghost btn-sm" data-action="open-billing-modal" data-billing-view="payments" data-i18n="dash_view_payment_methods" type="button">Voir les paiements</button>
             </div>
           </div>
         </div>
 
         <div class="card">
           <div class="card-header">
-            <div class="card-title"><div class="card-dot"></div><span data-i18n="section_payments_title">Payez comme vous voulez</span></div>
+            <div class="card-title"><div class="card-dot"></div><span data-i18n="dash_billing_builder_title">Configurer votre achat</span></div>
           </div>
           <div class="card-body">
-            <div class="billing-methods">
-              <div class="billing-method-card">
-                <div class="billing-method-title" data-i18n="payment_crypto">Crypto (OxaPay)</div>
-                <div class="billing-method-meta" data-i18n="payment_methods">BTC · ETH · USDT · LTC et plus via OxaPay</div>
-                <span class="pill paid" data-i18n="payment_crypto_status">AUTO</span>
+            <div class="billing-builder">
+              <div class="billing-selector-group">
+                <div class="billing-selector-label" data-i18n="dash_billing_choose_plan">Choisir un abonnement</div>
+                <div class="billing-choice-grid" id="billing-plan-selector">
+                  <button class="billing-choice active" data-billing-plan="premium" type="button">
+                    <span class="billing-choice-title">Premium</span>
+                    <span class="billing-choice-meta">2€/mois</span>
+                  </button>
+                  <button class="billing-choice" data-billing-plan="pro" type="button">
+                    <span class="billing-choice-title">Pro</span>
+                    <span class="billing-choice-meta">5€/mois</span>
+                  </button>
+                </div>
               </div>
-              <div class="billing-method-card">
-                <div class="billing-method-title" data-i18n="payment_paypal">PayPal</div>
-                <div class="billing-method-meta" data-i18n="dash_payment_paypal_desc">Validation manuelle par l'équipe admin</div>
-                <span class="pill pending" data-i18n="payment_paypal_status">MANUEL</span>
+
+              <div class="billing-selector-group">
+                <div class="billing-selector-label" data-i18n="dash_billing_choose_method">Choisir une méthode de paiement</div>
+                <div class="billing-choice-grid billing-choice-grid-methods" id="billing-method-selector">
+                  <button class="billing-choice active" data-billing-method="oxapay" type="button">
+                    <span class="billing-choice-title" data-i18n="payment_crypto">Crypto (OxaPay)</span>
+                    <span class="billing-choice-meta" data-i18n="payment_crypto_status">AUTO</span>
+                  </button>
+                  <button class="billing-choice" data-billing-method="paypal" type="button">
+                    <span class="billing-choice-title" data-i18n="payment_paypal">PayPal</span>
+                    <span class="billing-choice-meta" data-i18n="payment_paypal_status">MANUEL</span>
+                  </button>
+                  <button class="billing-choice" data-billing-method="giftcard" type="button">
+                    <span class="billing-choice-title" data-i18n="payment_gift">Carte cadeau</span>
+                    <span class="billing-choice-meta" data-i18n="payment_gift_status">MANUEL</span>
+                  </button>
+                </div>
               </div>
-              <div class="billing-method-card">
-                <div class="billing-method-title" data-i18n="payment_gift">Carte cadeau</div>
-                <div class="billing-method-meta" data-i18n="dash_payment_gift_desc">Validation manuelle après vérification du code</div>
-                <span class="pill pending" data-i18n="payment_gift_status">MANUEL</span>
+
+              <div class="billing-note-card billing-purchase-summary" id="billing-purchase-summary">
+                <div class="billing-kicker" data-i18n="dash_billing_summary">Résumé</div>
+                <div style="font-size:13px;color:var(--text);font-weight:700" id="billing-summary-title">Premium · Crypto</div>
+                <div style="font-size:11.5px;color:var(--text2);line-height:1.6;margin-top:6px" id="billing-summary-description">
+                  Paiement automatique via OxaPay.
+                </div>
               </div>
-            </div>
-            <div class="billing-note-card">
-              <div class="billing-kicker" data-i18n="dash_payment_flow_title">Comment payer</div>
-              <div style="font-size:11.5px;color:var(--text2);line-height:1.6" data-i18n="dash_payment_flow_desc">
-                Les moyens de paiement disponibles et opérationnels sont ceux affichés sur le site. Après paiement, l'activation est automatique en crypto ou validée par l'équipe admin pour les méthodes manuelles.
+
+              <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+                <button class="btn btn-primary" data-action="submit-purchase" type="button" data-i18n="dash_billing_buy">Acheter l'abonnement</button>
+                <div style="font-size:11px;color:var(--text3)" data-i18n="dash_billing_buy_note">La commande est créée pour le serveur sélectionné.</div>
               </div>
+              <div id="billing-purchase-feedback" class="billing-purchase-feedback" style="display:none"></div>
             </div>
           </div>
-        </div>
-      </div>
-
-      <div class="pricing-grid-dashboard">
-        <div class="billing-plan-card">
-          <div class="billing-plan-name">Free</div>
-          <div class="billing-plan-price">0€<span>/mois</span></div>
-          <p data-i18n="plan_free_desc">Pour tester Veridian AI sur votre serveur.</p>
-        </div>
-        <div class="billing-plan-card featured">
-          <div class="billing-plan-name">Premium</div>
-          <div class="billing-plan-price">2€<span>/mois</span></div>
-          <p data-i18n="plan_premium_desc">Pour les communautés actives avec un support international.</p>
-        </div>
-        <div class="billing-plan-card">
-          <div class="billing-plan-name">Pro</div>
-          <div class="billing-plan-price">5€<span>/mois</span></div>
-          <p data-i18n="plan_pro_desc">Pour les serveurs à fort volume avec des besoins avancés.</p>
         </div>
       </div>
     </div>

@@ -22,6 +22,10 @@ let state = {
   currentGuild: null,
   guildMeta: {}, // { [guildId]: { plan?: string } }
   currentPage: "dashboard",
+  billingSelection: {
+    plan: "premium",
+    method: "oxapay",
+  },
 };
 
 function normalizeSnowflake(raw) {
@@ -49,6 +53,7 @@ document.addEventListener("DOMContentLoaded", () => {
   initSettingsTabs();
   initSettingsSave();
   initTicketSearch();
+  initBillingUI();
   updateTopbarDate();
 });
 
@@ -74,6 +79,9 @@ function bindStaticActions() {
       if (action === "refresh-tickets") return void loadTickets();
       if (action === "refresh-orders") return void loadOrders();
       if (action === "refresh-superadmin") return void loadSuperAdminData();
+      if (action === "open-billing-modal") return void openBillingModal(actionEl.dataset.billingView || "plans");
+      if (action === "close-billing-modal") return void closeBillingModal();
+      if (action === "submit-purchase") return void submitBillingPurchase();
       if (action === "kb-cancel") {
         const form = document.getElementById("kb-form");
         if (form) form.style.display = "none";
@@ -108,11 +116,38 @@ function bindStaticActions() {
       if (kbBtn.dataset.kbAction === "edit") return void editKBEntry(id);
       if (kbBtn.dataset.kbAction === "delete") return void deleteKBEntry(id);
     }
+
+    const billingTab = e.target.closest("[data-billing-modal-tab]");
+    if (billingTab) {
+      setBillingModalView(billingTab.dataset.billingModalTab || "plans");
+      return;
+    }
+
+    const billingPlan = e.target.closest("[data-billing-plan]");
+    if (billingPlan) {
+      state.billingSelection.plan = billingPlan.dataset.billingPlan || "premium";
+      renderBillingSelection();
+      return;
+    }
+
+    const billingMethod = e.target.closest("[data-billing-method]");
+    if (billingMethod) {
+      state.billingSelection.method = billingMethod.dataset.billingMethod || "oxapay";
+      renderBillingSelection();
+      return;
+    }
+
+    if (e.target.id === "billing-modal") {
+      closeBillingModal();
+    }
   });
 
   // Escape closes the transcript modal (if open).
   document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") closeTranscriptModal();
+    if (e.key === "Escape") {
+      closeTranscriptModal();
+      closeBillingModal();
+    }
   });
 
   // Changement de priorité de ticket (delegation change)
@@ -1065,6 +1100,8 @@ async function loadOrders() {
   if (planEl) planEl.textContent = "—";
   if (priceEl) priceEl.textContent = "";
   if (statusEl) statusEl.textContent = typeof t === "function" ? t("dash_loading") : "Chargement…";
+  renderBillingSelection();
+  hideBillingPurchaseFeedback();
 
   try {
     const stats = await apiFetch(`/internal/guild/${state.currentGuild.id}/stats`, { auth: true });
@@ -1085,9 +1122,16 @@ async function loadOrders() {
     }
     if (noteEl) {
       noteEl.textContent = plan === "free"
-        ? "Passez à Premium ou Pro depuis le site pour débloquer plus de tickets, de langues et d'options."
-        : "Votre serveur dispose déjà d'un abonnement actif. Vous pouvez le renouveler ou le faire évoluer depuis le site.";
+        ? "Passez à Premium ou Pro avec les sélecteurs ci-dessous pour débloquer plus de tickets, de langues et d'options."
+        : "Votre serveur dispose déjà d'un abonnement actif. Vous pouvez le renouveler ou le faire évoluer directement depuis cette page.";
     }
+
+    if (plan === "pro") {
+      state.billingSelection.plan = "pro";
+    } else if (state.billingSelection.plan !== "premium") {
+      state.billingSelection.plan = "premium";
+    }
+    renderBillingSelection();
   } catch (e) {
     if (statusEl) {
       statusEl.className = "pill rejected";
@@ -1133,6 +1177,121 @@ function renderOrders(orders, containerId = "orders-list") {
       </div>
     </div>`;
   }).join("");
+}
+
+function initBillingUI() {
+  renderBillingSelection();
+  setBillingModalView("plans");
+}
+
+function openBillingModal(view = "plans") {
+  const modal = document.getElementById("billing-modal");
+  if (!modal) return;
+  setBillingModalView(view);
+  modal.classList.add("open");
+  modal.setAttribute("aria-hidden", "false");
+}
+
+function closeBillingModal() {
+  const modal = document.getElementById("billing-modal");
+  if (!modal) return;
+  modal.classList.remove("open");
+  modal.setAttribute("aria-hidden", "true");
+}
+
+function setBillingModalView(view) {
+  document.querySelectorAll("[data-billing-modal-tab]").forEach((el) => {
+    el.classList.toggle("active", el.dataset.billingModalTab === view);
+  });
+  document.querySelectorAll("[data-billing-modal-view]").forEach((el) => {
+    el.classList.toggle("active", el.dataset.billingModalView === view);
+  });
+}
+
+function renderBillingSelection() {
+  document.querySelectorAll("[data-billing-plan]").forEach((el) => {
+    el.classList.toggle("active", el.dataset.billingPlan === state.billingSelection.plan);
+  });
+  document.querySelectorAll("[data-billing-method]").forEach((el) => {
+    el.classList.toggle("active", el.dataset.billingMethod === state.billingSelection.method);
+  });
+
+  const summaryTitle = document.getElementById("billing-summary-title");
+  const summaryDescription = document.getElementById("billing-summary-description");
+  if (!summaryTitle || !summaryDescription) return;
+
+  const plan = state.billingSelection.plan;
+  const method = state.billingSelection.method;
+  const planLabel = plan === "pro" ? "Pro" : "Premium";
+  const methodLabel =
+    method === "paypal" ? "PayPal" :
+    method === "giftcard" ? (typeof t === "function" ? t("payment_gift") : "Carte cadeau") :
+    "Crypto";
+
+  summaryTitle.textContent = `${planLabel} · ${methodLabel}`;
+  summaryDescription.textContent =
+    method === "oxapay"
+      ? "Paiement automatique via OxaPay. Une page de paiement sera générée avec la référence de commande."
+      : method === "paypal"
+        ? "Une commande manuelle sera créée avec la référence et les instructions PayPal."
+        : "Une commande manuelle sera créée. Vous pourrez transmettre votre code de carte cadeau avec la référence.";
+}
+
+function hideBillingPurchaseFeedback() {
+  const box = document.getElementById("billing-purchase-feedback");
+  if (!box) return;
+  box.style.display = "none";
+  box.className = "billing-purchase-feedback";
+  box.innerHTML = "";
+}
+
+function renderBillingPurchaseFeedback(data) {
+  const box = document.getElementById("billing-purchase-feedback");
+  if (!box) return;
+
+  const payment = data.payment || {};
+  const actionUrl = payment.action_url ? `
+    <a class="btn btn-primary btn-sm" href="${escAttr(payment.action_url)}" target="_blank" rel="noopener noreferrer">
+      ${escHtml(payment.action_label || "Continuer")}
+    </a>
+  ` : "";
+
+  const reference = payment.reference || data.order_id;
+  box.className = "billing-purchase-feedback success";
+  box.style.display = "block";
+  box.innerHTML = `
+    <div class="billing-kicker">COMMANDE CRÉÉE</div>
+    <div style="font-size:13px;font-weight:700;color:var(--text)">${escHtml(payment.title || "Paiement prêt")}</div>
+    <div style="font-size:11.5px;color:var(--text2);line-height:1.65;margin-top:6px">${escHtml(payment.description || "")}</div>
+    <div style="font-size:11px;color:var(--text3);font-family:'Space Mono',monospace;margin-top:10px">Référence: ${escHtml(reference || "—")}</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">${actionUrl}</div>
+  `;
+}
+
+async function submitBillingPurchase() {
+  if (!state.currentGuild) return showToast("Aucun serveur sélectionné", "warn");
+
+  const btn = document.querySelector('[data-action="submit-purchase"]');
+  if (btn) {
+    btn.disabled = true;
+    btn.textContent = "Création…";
+  }
+
+  try {
+    const data = await apiPost(`/internal/guild/${state.currentGuild.id}/purchase`, {
+      plan: state.billingSelection.plan,
+      method: state.billingSelection.method,
+    });
+    renderBillingPurchaseFeedback(data);
+    showToast(`Commande ${data.order_id} créée`, "success");
+  } catch (e) {
+    showToast("Erreur achat: " + e.message, "error");
+  } finally {
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = typeof t === "function" ? t("dash_billing_buy") : "Acheter l'abonnement";
+    }
+  }
 }
 
 async function validateOrder(btn, orderId, status) {
