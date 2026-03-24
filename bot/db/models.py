@@ -380,6 +380,24 @@ class TicketModel:
             )
             return cursor.fetchall()
 
+    @staticmethod
+    def list_active_with_initial_message(limit: int = 500) -> List[Dict]:
+        """
+        Retourne les tickets encore interactifs avec leur message initial.
+        Utilisé pour réenregistrer les vues persistantes au redémarrage du bot.
+        """
+        with get_db_context() as conn:
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute(
+                f"SELECT id, guild_id, channel_id, initial_message_id, status "
+                f"FROM {DB_TABLE_PREFIX}tickets "
+                f"WHERE status IN ('open', 'in_progress', 'pending_close') "
+                f"AND initial_message_id IS NOT NULL "
+                f"ORDER BY opened_at DESC LIMIT %s",
+                (int(limit),)
+            )
+            return cursor.fetchall()
+
 
 # ============================================================================
 # VAI_TICKET_MESSAGES

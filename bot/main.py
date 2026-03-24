@@ -44,6 +44,7 @@ from bot.config import DASHBOARD_URL
 
 # Heure de démarrage du bot (sera mise à jour dans on_ready)
 _bot_start_time: datetime | None = None
+_persistent_views_restored = False
 
 # Fonction d'initialisation DB
 def initialize_database():
@@ -143,6 +144,10 @@ async def on_ready():
                 pass
     except Exception as e:
         logger.debug(f"Guild DB sync failed: {e}")
+
+    if not _persistent_views_restored:
+        await _restore_persistent_views()
+        _persistent_views_restored = True
     
     # Démarrer le heartbeat (mise à jour du statut en DB)
     if not heartbeat_loop.is_running():
@@ -344,6 +349,73 @@ async def _deploy_ticket_open_messages():
 
     except Exception as e:
         logger.debug(f"ticket_open_deploy_loop: {e}")
+
+
+async def _restore_persistent_views():
+    """
+    Re-enregistre les vues persistantes après un redémarrage pour que
+    les boutons/selecteurs des tickets déjà ouverts restent interactifs.
+    """
+    try:
+        from bot.db.models import GuildModel, TicketModel
+        from bot.cogs.tickets import TicketOpenButtonView, TicketOpenSelectView, TicketControlView
+        import json
+
+        restored_open = 0
+        restored_tickets = 0
+
+        for cfg in GuildModel.get_all():
+            guild_id = int(cfg.get("id") or 0)
+            message_id = cfg.get("ticket_open_message_id")
+            if not guild_id or not message_id:
+                continue
+
+            selector_enabled = int(cfg.get("ticket_selector_enabled") or 0) == 1
+            try:
+                if selector_enabled:
+                    options_raw = cfg.get("ticket_selector_options")
+                    if isinstance(options_raw, str):
+                        options = json.loads(options_raw) if options_raw.strip() else []
+                    elif isinstance(options_raw, list):
+                        options = options_raw
+                    else:
+                        options = []
+                    view = TicketOpenSelectView(
+                        bot,
+                        guild_id=guild_id,
+                        placeholder=(cfg.get("ticket_selector_placeholder") or "Sélectionnez le type de ticket"),
+                        options=options,
+                    )
+                else:
+                    view = TicketOpenButtonView(
+                        bot,
+                        guild_id=guild_id,
+                        label=(cfg.get("ticket_button_label") or "Ouvrir un ticket"),
+                        style=(cfg.get("ticket_button_style") or "primary"),
+                        emoji=(cfg.get("ticket_button_emoji") or None),
+                    )
+
+                bot.add_view(view, message_id=int(message_id))
+                restored_open += 1
+            except Exception as e:
+                logger.warning(f"[views] impossible de restaurer le message d'ouverture pour guild {guild_id}: {e}")
+
+        for ticket in TicketModel.list_active_with_initial_message(limit=1000):
+            ticket_id = int(ticket.get("id") or 0)
+            message_id = ticket.get("initial_message_id")
+            if not ticket_id or not message_id:
+                continue
+            try:
+                bot.add_view(TicketControlView(ticket_id, bot), message_id=int(message_id))
+                restored_tickets += 1
+            except Exception as e:
+                logger.warning(f"[views] impossible de restaurer la vue du ticket {ticket_id}: {e}")
+
+        logger.info(
+            f"✓ Vues persistantes restaurées: {restored_open} message(s) d'ouverture, {restored_tickets} ticket(s)"
+        )
+    except Exception as e:
+        logger.warning(f"[views] restauration persistante échouée: {e}")
 
 
 @tasks.loop(seconds=60)
