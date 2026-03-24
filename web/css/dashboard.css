@@ -873,8 +873,27 @@ textarea.form-input{white-space:pre-wrap;overflow-wrap:anywhere;word-break:break
 }
 .toggle-info .toggle-name { font-size: 13px; font-weight: 600; color: var(--text); }
 .toggle-info .toggle-desc { font-size: 11.5px; color: var(--text3); margin-top: 1px; }
+.settings-layout {
+  display: grid;
+  grid-template-columns: 220px minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.settings-side {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  position: sticky;
+  top: 0;
+}
+
+.settings-content {
+  min-width: 0;
+}
+
 .settings-tabs{display:flex;gap:8px;flex-wrap:wrap;margin:0 0 14px}
-.settings-tab{background:var(--surface);border:1px solid var(--border);color:var(--text2);padding:8px 10px;border-radius:10px;font-size:12px;cursor:pointer;transition:all .15s;font-family:'Space Mono',monospace}
+.settings-tab{background:var(--surface);border:1px solid var(--border);color:var(--text2);padding:10px 12px;border-radius:10px;font-size:12px;cursor:pointer;transition:all .15s;font-family:'Space Mono',monospace;text-align:left;width:100%}
 .settings-tab:hover{border-color:rgba(255,255,255,.18);color:var(--text)}
 .settings-tab.active{background:rgba(45,255,143,0.12);border-color:rgba(45,255,143,0.22);color:var(--accent)}
 .settings-panel{display:none}
@@ -979,13 +998,15 @@ textarea.form-input{white-space:pre-wrap;overflow-wrap:anywhere;word-break:break
 }
 
 /* Settings tabs - pas de max-width */
-.settings-tabs {
-  max-width: none;
-  width: 100%;
-}
-
 @media (max-width: 900px) {
+  .settings-layout {
+    grid-template-columns: 1fr;
+  }
+  .settings-side {
+    position: static;
+  }
   .settings-grid-2 { grid-template-columns: 1fr; }
+  .pricing-grid-dashboard { grid-template-columns: 1fr; }
 }
 
 /* Page settings — pas de max-width sur les éléments enfants */

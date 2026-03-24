@@ -502,13 +502,14 @@
         </div>
       </div>
 
-      <!-- Sub-categories -->
-      <div class="settings-tabs" role="tablist" aria-label="Settings categories">
-        <button class="settings-tab active" type="button" data-settings-tab="general" role="tab" aria-selected="true">Général</button>
-        <button class="settings-tab" type="button" data-settings-tab="tickets" role="tab" aria-selected="false">Tickets</button>
-        <button class="settings-tab" type="button" data-settings-tab="ai" role="tab" aria-selected="false">Support AI custom</button>
-      </div>
+      <div class="settings-layout">
+      <aside class="settings-side" aria-label="Settings categories">
+        <button class="settings-tab active" type="button" data-settings-tab="general" role="tab" aria-selected="true" data-i18n="dash_settings_general">Général</button>
+        <button class="settings-tab" type="button" data-settings-tab="tickets" role="tab" aria-selected="false" data-i18n="dash_settings_tickets">Tickets</button>
+        <button class="settings-tab" type="button" data-settings-tab="ai" role="tab" aria-selected="false" data-i18n="dash_settings_ai">IA de support</button>
+      </aside>
 
+      <div class="settings-content">
       <div class="settings-panel active" data-settings-panel="general">
         <div class="grid-2">
 
@@ -765,7 +766,7 @@
       <div class="settings-panel" data-settings-panel="ai">
         <div class="card">
           <div class="card-header">
-            <div class="card-title"><div class="card-dot"></div><span>Support AI custom</span></div>
+            <div class="card-title"><div class="card-dot"></div><span data-i18n="dash_settings_ai_card">IA de support personnalisée</span></div>
           </div>
           <div class="card-body">
             <div class="toggle-row">
@@ -783,6 +784,8 @@
           </div>
         </div>
       </div><!-- /.settings-panel ai -->
+      </div><!-- /.settings-content -->
+      </div><!-- /.settings-layout -->
     </div>
 
     <!-- ══════════════════════════════════════════════════════
