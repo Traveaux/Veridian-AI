@@ -1,8 +1,8 @@
 /**
  * Veridian AI — Dashboard JS
  * Auth: JWT Bearer uniquement pour les appels /internal/*
- * CDC 2026: utilisateur lambda = Tickets + Settings uniquement
- *           Super Admin = tout (Dashboard, Orders, KB, Super Admin, clés Groq)
+ * CDC 2026: utilisateur lambda = Tickets + Abonnement + Settings + KB
+ *           Admin global = Dashboard + panel admin global
  */
 
 // ─────────────────────────────────────────────────────────────
@@ -286,7 +286,7 @@ function renderDashboard() {
   const u = state.user;
   if (u) {
     document.querySelector(".user-name").textContent = u.username || "—";
-    document.querySelector(".user-role").innerHTML = isSuper ? 'Super Admin <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--yellow)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-left:2px"><path d="M2 4l3 12h14l3-12-6 7-4-7-4 7-6-7z"></path></svg>' : "Admin Serveur";
+    document.querySelector(".user-role").innerHTML = isSuper ? 'Admin <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--yellow)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-left:2px"><path d="M2 4l3 12h14l3-12-6 7-4-7-4 7-6-7z"></path></svg>' : "Admin serveur";
     const avatarImg = document.querySelector(".user-avatar-img");
     if (avatarImg && u.avatar) avatarImg.src = u.avatar;
   }
@@ -456,9 +456,7 @@ function updateServerPlanDisplay() {
 }
 
 function toggleSuperAdminNav(isSuperAdmin) {
-  // Tous les éléments marqués [data-super-admin] sont réservés au Super Admin :
-  // nav items Dashboard, Orders, KB + groupe Super Admin dans la sidebar
-  // CDC 2026 : utilisateur lambda = Tickets + Settings uniquement
+  // Tous les éléments marqués [data-super-admin] sont réservés à l'admin global.
   document.querySelectorAll("[data-super-admin]").forEach((el) => {
     el.style.display = isSuperAdmin ? "" : "none";
   });
@@ -497,12 +495,12 @@ function navigateTo(page) {
 
   // Breadcrumb
   const names = {
-    dashboard: "Dashboard",
-    tickets: "Tickets",
-    orders: "Orders",
-    settings: "Settings",
-    kb: "Knowledge Base",
-    superadmin: "Super Admin",
+    dashboard: typeof t === "function" ? t("dash_page_dashboard") : "Dashboard",
+    tickets: typeof t === "function" ? t("dash_tickets") : "Tickets",
+    orders: typeof t === "function" ? t("dash_billing") : "Abonnement",
+    settings: typeof t === "function" ? t("dash_settings") : "Settings",
+    kb: typeof t === "function" ? t("dash_kb") : "Knowledge Base",
+    superadmin: typeof t === "function" ? t("dash_admin") : "Admin",
   };
   const breadcrumb = document.getElementById("breadcrumb-page");
   if (breadcrumb) breadcrumb.textContent = names[page] || page;
@@ -1279,7 +1277,7 @@ function renderTicketWelcomePreview() {
 
   const vars = {
     ticket_id: "#1842",
-    user_mention: "@Jordan",
+    user_mention: "@useur",
     user_language: "Français",
     staff_language: "Anglais",
     assigned_staff: "Non assigné",
