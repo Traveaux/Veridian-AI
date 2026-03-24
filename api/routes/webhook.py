@@ -9,9 +9,8 @@ import hmac
 import hashlib
 import os
 import json
-from datetime import datetime
-from bot.db.connection import get_db_context
-from bot.db.models import SubscriptionModel, PaymentModel, OrderModel, PendingNotificationModel
+from loguru import logger
+from bot.db.models import SubscriptionModel, PaymentModel, OrderModel, PendingNotificationModel, AuditLogModel
 from bot.services.notifications import notify_bot_owner_payment
 
 router = APIRouter(prefix="/webhook", tags=["webhook"])
@@ -65,33 +64,45 @@ async def oxapay_webhook(request: Request):
                 content={"status": "ignored", "reason": "payment not completed"}
             )
         
-        user_id = payload.get("user_id")
-        guild_id = payload.get("guild_id")
-        plan = payload.get("plan")
         order_id = payload.get("order_id")
         invoice_id = payload.get("invoice_id")
         amount = payload.get("amount")
+        currency = payload.get("currency") or "EUR"
         
-        # Enregistrer le paiement
-        with get_db_context() as db:
-            # 1. Créer entrée paiement
-            PaymentModel.create(
-                user_id=user_id,
-                guild_id=guild_id,
-                order_id=order_id,
-                method="oxapay",
-                amount=amount,
-                currency="USD",
-                plan=plan,
-                status="completed",
-                oxapay_invoice_id=invoice_id
+        order = OrderModel.get(order_id) if order_id else None
+        if order and str(order.get("status") or "").lower() == "paid":
+            return JSONResponse(
+                status_code=200,
+                content={"status": "ignored", "reason": "order already processed"}
             )
-            
-            # 2. Marquer la commande comme payée si elle existe
+
+        user_id = payload.get("user_id") or (order or {}).get("user_id")
+        guild_id = payload.get("guild_id") or (order or {}).get("guild_id")
+        plan = payload.get("plan") or (order or {}).get("plan")
+
+        if not all([user_id, guild_id, plan]):
+            raise HTTPException(status_code=400, detail="Missing order context")
+        
+        # Enregistrer le paiement dans la base de données
+        try:
+            # 1. Marquer la commande comme payée si elle existe
             if order_id:
                 OrderModel.update_status(order_id, "paid", "OxaPay webhook")
             
-            # 3. Créer/activer abonnement (30 jours par défaut)
+            # 2. Créer l'enregistrement de paiement réel
+            payment_id = PaymentModel.create(
+                user_id=user_id,
+                guild_id=guild_id,
+                method="oxapay",
+                amount=amount,
+                currency=currency,
+                plan=plan,
+                order_id=order_id,
+                status="completed",
+                oxapay_invoice_id=invoice_id,
+            )
+
+            # 3. Activer l'abonnement (30 jours)
             SubscriptionModel.create(
                 guild_id=guild_id,
                 user_id=user_id,
@@ -100,12 +111,20 @@ async def oxapay_webhook(request: Request):
                 duration_days=30
             )
 
-            # 4. Ajouter une notification DM pour l'utilisateur
-            PendingNotificationModel.add(
-                user_id=user_id,
-                content=f"🚀 Votre abonnement **{plan.upper()}** a été activé avec succès sur votre serveur !\nMerci pour votre confiance. Vous pouvez maintenant profiter de toutes les fonctionnalités avancées.",
-                category="payment_success"
+            # 4. Enregistrer l'action dans les logs d'audit
+            AuditLogModel.log(
+                actor_id=user_id,
+                action="payment.oxapay.success",
+                guild_id=guild_id,
+                details={"order_id": order_id, "amount": amount, "plan": plan}
             )
+
+            # 5. Notifier l'utilisateur via notification pendante (sera envoyée par le bot)
+            msg = f"✅ Votre paiement Crypto (**{plan.upper()}**) a été validé ! Votre abonnement est actif."
+            PendingNotificationModel.add(user_id, msg)
+        except Exception as e:
+            logger.error(f"Erreur lors du traitement du paiement OxaPay: {e}")
+            raise HTTPException(status_code=500, detail="Internal processing error")
         
         # 4. Notifier le Bot Owner
         await notify_bot_owner_payment(
@@ -124,5 +143,7 @@ async def oxapay_webhook(request: Request):
     
     except json.JSONDecodeError:
         raise HTTPException(status_code=400, detail="Invalid JSON")
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

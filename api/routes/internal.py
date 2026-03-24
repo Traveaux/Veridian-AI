@@ -6,13 +6,16 @@ Toute la configuration passe par ici, plus de commandes bot admin.
 from fastapi import APIRouter, Depends, HTTPException, Header, Request
 from pydantic import BaseModel
 from typing import Optional, List
+from datetime import datetime
+import random
 from bot.db.connection import get_db_context
 from bot.db.models import (
     GuildModel, TicketModel, UserModel, SubscriptionModel,
     OrderModel, PaymentModel, KnowledgeBaseModel, AuditLogModel,
     BotStatusModel, TicketMessageModel, AuditLogModel
 )
-from bot.config import PLAN_LIMITS, DB_TABLE_PREFIX
+from bot.config import PLAN_LIMITS, DB_TABLE_PREFIX, PRICING, DASHBOARD_URL
+from bot.services.oxapay import OxaPayClient
 from loguru import logger
 import os
 import jwt as pyjwt
@@ -159,6 +162,7 @@ def verify_internal_auth(request: Request, x_api_secret: str = Header(None)) -> 
             guild_ids = payload.get("guild_ids", [])
 
         request.state.user_id = user_id
+        request.state.username = str(payload.get("username") or "")
         request.state.is_super_admin = bool(payload.get("is_super_admin", False))
         request.state.guild_ids = guild_ids
         return {
@@ -284,6 +288,11 @@ class KBEntryBody(BaseModel):
 
 class TicketPriorityBody(BaseModel):
     priority: str
+
+
+class PurchaseBody(BaseModel):
+    plan: str
+    method: str
 
 
 # ============================================================================
@@ -701,6 +710,107 @@ def get_guild_stats(guild_id: int):
         "current_plan":       subscription["plan"] if subscription else "free",
         "is_subscribed":      bool(subscription),
         "kb_entries":         kb_count
+    }
+
+
+def _generate_order_id() -> str:
+    now = datetime.utcnow()
+    return f"VAI-{now.year}{now.month:02d}-{random.randint(1000, 9999)}"
+
+
+@router.post("/guild/{guild_id}/purchase", dependencies=[Depends(verify_guild_access)])
+async def create_dashboard_purchase(guild_id: int, body: PurchaseBody, request: Request):
+    plan = str(body.plan or "").strip().lower()
+    method = str(body.method or "").strip().lower()
+
+    if plan not in PRICING:
+        raise HTTPException(status_code=400, detail="Plan invalide")
+    if method not in {"paypal", "giftcard", "oxapay"}:
+        raise HTTPException(status_code=400, detail="Methode de paiement invalide")
+
+    guild = GuildModel.get(guild_id)
+    if not guild:
+        raise HTTPException(status_code=404, detail="Serveur introuvable")
+
+    actor_id = getattr(request.state, "user_id", 0) or 0
+    actor_username = getattr(request.state, "username", "") or None
+    amount = float(PRICING[plan])
+    order_id = _generate_order_id()
+    payment_data = None
+
+    if method == "oxapay":
+        callback_url = f"https://{os.getenv('API_DOMAIN', 'api.veridiancloud.xyz')}/webhook/oxapay"
+        invoice = await OxaPayClient().create_invoice(actor_id, amount, order_id, callback_url)
+        pay_link = (invoice or {}).get("payLink")
+        if not pay_link:
+            raise HTTPException(status_code=502, detail="Impossible de creer le checkout crypto")
+        payment_data = {
+            "mode": "checkout",
+            "title": "Paiement crypto",
+            "description": "Le paiement est automatique. Utilisez le bouton ci-dessous pour ouvrir la page de paiement.",
+            "action_label": "Payer maintenant",
+            "action_url": pay_link,
+        }
+
+    created = OrderModel.create(
+        order_id=order_id,
+        user_id=actor_id,
+        user_username=actor_username,
+        guild_id=guild_id,
+        guild_name=guild.get("name"),
+        method=method,
+        plan=plan,
+        amount=amount,
+    )
+    if not created:
+        raise HTTPException(status_code=500, detail="Impossible de creer la commande")
+
+    if payment_data is None:
+        if method == "paypal":
+            paypal_email = os.getenv("PAYPAL_EMAIL", "[Email PayPal non configure]")
+            payment_data = {
+                "mode": "manual",
+                "title": "Paiement PayPal",
+                "description": (
+                    f"Envoyez {amount:.2f} EUR a {paypal_email} puis gardez la reference {order_id}. "
+                    "La validation est manuelle."
+                ),
+                "reference": order_id,
+                "payment_target": paypal_email,
+                "action_label": "Suivre la commande",
+                "action_url": DASHBOARD_URL,
+            }
+        else:
+            payment_data = {
+                "mode": "manual",
+                "title": "Carte cadeau",
+                "description": (
+                    "La commande est creee. Ouvrez un ticket ou contactez le support avec le code de la carte "
+                    f"et la reference {order_id} pour validation."
+                ),
+                "reference": order_id,
+                "action_label": "Ouvrir le dashboard",
+                "action_url": DASHBOARD_URL,
+            }
+
+    AuditLogModel.log(
+        actor_id=actor_id,
+        actor_username=actor_username,
+        guild_id=guild_id,
+        action="order.create",
+        target_id=order_id,
+        details={"plan": plan, "method": method, "amount": amount},
+        ip_address=request.client.host if request.client else None,
+    )
+
+    return {
+        "status": "success",
+        "order_id": order_id,
+        "guild_id": guild_id,
+        "plan": plan,
+        "method": method,
+        "amount": amount,
+        "payment": payment_data,
     }
 
 
