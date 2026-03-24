@@ -195,6 +195,13 @@ def _safe_filename_part(value: str | None, fallback: str) -> str:
     return clean or fallback
 
 
+def _build_transcript_filename(ticket_id: int, audience: str, language_code: str | None) -> str:
+    code = _normalize_lang(language_code, "en")
+    language_name = _safe_filename_part(get_lang_name(code), code)
+    audience_name = _safe_filename_part(audience, "audience")
+    return f"ticket-{ticket_id}-{audience_name}-{language_name}-{code}.txt"
+
+
 class TicketsCog(commands.Cog):
     """Tickets de support avec traduction en temps reel."""
 
@@ -340,7 +347,7 @@ class TicketsCog(commands.Cog):
             display_language=display_language,
             audience=audience,
         )
-        filename = f"ticket-{int(ticket.get('id') or 0)}-{_safe_filename_part(audience, 'audience')}-{_safe_filename_part(display_language or 'en', 'lang')}.txt"
+        filename = _build_transcript_filename(int(ticket.get("id") or 0), audience, display_language)
         return discord.File(io.BytesIO(content.encode("utf-8")), filename=filename)
 
     @tasks.loop(hours=24)
