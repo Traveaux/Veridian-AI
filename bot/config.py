@@ -3,7 +3,7 @@ Constantes globales du projet Veridian AI v0.2
 """
 
 # Version
-VERSION = "0.2.0"
+VERSION = "1.0.0"
 VERSION_EMOJI = "🤖"
 
 # Discord Configuration

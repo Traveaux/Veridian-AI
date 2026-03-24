@@ -111,13 +111,15 @@ bot = commands.Bot(
 async def on_ready():
     """Événement déclenché quand le bot est prêt."""
     global _bot_start_time
+    global _persistent_views_restored
     _bot_start_time = datetime.now(timezone.utc)
     
     status_text = f"{VERSION_EMOJI} v{VERSION}"
     await bot.change_presence(
         activity=discord.Activity(
-            type=discord.ActivityType.watching,
-            name=status_text
+            type=discord.ActivityType.streaming,
+            name=status_text,
+            url=DASHBOARD_URL
         ),
         status=discord.Status.online
     )
