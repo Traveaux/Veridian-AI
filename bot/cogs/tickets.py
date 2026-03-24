@@ -609,23 +609,28 @@ class TicketsCog(commands.Cog):
             try:
                 user = self.bot.get_user(ticket["user_id"]) or await self.bot.fetch_user(ticket["user_id"])
                 if user:
-                    user_embed = discord.Embed(
-                        title="Résumé de votre ticket",
-                        description=transcript_user or transcript_staff or "Aucun résumé disponible.",
-                        color=discord.Color.blue(),
-                    )
-                    user_embed.add_field(name="Assigné à", value=f"`{assigned_label}`", inline=True)
-                    if metrics.get("avg_response"):
-                        user_embed.add_field(name="Temps de réponse moyen", value=f"`{metrics['avg_response']}`", inline=True)
-                    if metrics.get("open_duration"):
-                        user_embed.add_field(name="Durée totale", value=f"`{metrics['open_duration']}`", inline=True)
-                    user_embed.set_footer(text=f"Ticket #{ticket['id']} · {guild.name if guild else ''}")
                     user_file = self._build_transcript_file(
                         ticket=ticket,
                         messages=messages,
                         display_language=user_lang or "en",
                         audience="user",
                     )
+                    user_embed = discord.Embed(
+                        title="Résumé de votre ticket",
+                        description=transcript_user or transcript_staff or "Aucun résumé disponible.",
+                        color=discord.Color.blue(),
+                    )
+                    user_embed.add_field(name="Assigné à", value=f"`{assigned_label}`", inline=True)
+                    user_embed.add_field(
+                        name="Fichier téléchargeable",
+                        value=f"`{user_file.filename}`",
+                        inline=False,
+                    )
+                    if metrics.get("avg_response"):
+                        user_embed.add_field(name="Temps de réponse moyen", value=f"`{metrics['avg_response']}`", inline=True)
+                    if metrics.get("open_duration"):
+                        user_embed.add_field(name="Durée totale", value=f"`{metrics['open_duration']}`", inline=True)
+                    user_embed.set_footer(text=f"Ticket #{ticket['id']} · {guild.name if guild else ''}")
                     await user.send(embed=user_embed, file=user_file)
             except Exception:
                 pass
@@ -649,21 +654,15 @@ class TicketsCog(commands.Cog):
                     meta.add_field(name="Durée totale", value=f"`{metrics.get('open_duration') or 'N/A'}`", inline=True)
                     if ticket.get("opened_at"):
                         meta.add_field(name="Ouvert le", value=f"<t:{int(ticket['opened_at'].timestamp())}:f>", inline=True)
-                    await log_chan.send(embed=meta)
-
                     staff_file = self._build_transcript_file(
                         ticket=ticket,
                         messages=messages,
                         display_language=staff_lang or "en",
                         audience="staff",
                     )
-                    staff_transcript_embed = discord.Embed(
-                        title=f"Transcription staff · {get_lang_name(staff_lang or 'en')}",
-                        description=(transcript_staff or "Non généré")[:4096],
-                        color=discord.Color.greyple(),
-                    )
-                    await log_chan.send(embed=staff_transcript_embed, file=staff_file)
-
+                    files = [staff_file]
+                    file_labels = [f"`{staff_file.filename}`"]
+                    summary_bits = [f"Staff ({get_lang_name(staff_lang or 'en')}): {(transcript_staff or 'Non généré').strip()}"]
                     if user_lang and user_lang != staff_lang:
                         user_file = self._build_transcript_file(
                             ticket=ticket,
@@ -671,12 +670,23 @@ class TicketsCog(commands.Cog):
                             display_language=user_lang,
                             audience="user",
                         )
-                        user_transcript_embed = discord.Embed(
-                            title=f"Transcription utilisateur · {get_lang_name(user_lang)}",
-                            description=(transcript_user or transcript_staff or "Non généré")[:4096],
-                            color=discord.Color.blurple(),
+                        files.append(user_file)
+                        file_labels.append(f"`{user_file.filename}`")
+                        summary_bits.append(
+                            f"Utilisateur ({get_lang_name(user_lang)}): {((transcript_user or transcript_staff) or 'Non généré').strip()}"
                         )
-                        await log_chan.send(embed=user_transcript_embed, file=user_file)
+
+                    meta.add_field(
+                        name="Fichiers téléchargeables",
+                        value="\n".join(file_labels),
+                        inline=False,
+                    )
+                    meta.add_field(
+                        name="Résumés",
+                        value=_truncate_block("\n\n".join(summary_bits), 1024),
+                        inline=False,
+                    )
+                    await log_chan.send(embed=meta, files=files)
         except Exception as e:
             logger.debug(f"Erreur logs/DMs fermeture: {e}")
 
