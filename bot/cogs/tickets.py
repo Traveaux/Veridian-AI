@@ -105,6 +105,57 @@ WELCOME_TEXTS = {
     },
 }
 
+TICKET_BUTTON_TEXTS = {
+    "take": {
+        "en": "Take ticket",
+        "fr": "Prendre le ticket",
+        "es": "Tomar el ticket",
+        "de": "Ticket ubernehmen",
+        "it": "Prendi il ticket",
+        "pt": "Assumir ticket",
+    },
+    "taken_by": {
+        "en": "Taken by {name}",
+        "fr": "Pris par {name}",
+        "es": "Tomado por {name}",
+        "de": "Ubernommen von {name}",
+        "it": "Preso da {name}",
+        "pt": "Assumido por {name}",
+    },
+    "close": {
+        "en": "Close ticket",
+        "fr": "Fermer le ticket",
+        "es": "Cerrar ticket",
+        "de": "Ticket schliessen",
+        "it": "Chiudi ticket",
+        "pt": "Fechar ticket",
+    },
+    "confirm_close": {
+        "en": "Confirm close",
+        "fr": "Confirmer la fermeture",
+        "es": "Confirmar cierre",
+        "de": "Schliessung bestatigen",
+        "it": "Conferma chiusura",
+        "pt": "Confirmar fecho",
+    },
+    "reopen": {
+        "en": "Reopen",
+        "fr": "Reouvrir",
+        "es": "Reabrir",
+        "de": "Wieder offnen",
+        "it": "Riapri",
+        "pt": "Reabrir",
+    },
+    "transcript": {
+        "en": "Transcript",
+        "fr": "Transcript",
+        "es": "Transcripcion",
+        "de": "Transkript",
+        "it": "Trascrizione",
+        "pt": "Transcricao",
+    },
+}
+
 
 def _normalize_lang(code: str | None, fallback: str = "en") -> str:
     raw = (code or "").strip().lower()
@@ -261,6 +312,7 @@ class TicketsCog(commands.Cog):
         self.bot         = bot
         self.translator  = TranslatorService()
         self.groq_client = GroqClient()
+        self._label_translation_cache: dict[tuple[str, str, str], str] = {}
         self.auto_close_task.start()
         logger.info("Cog Tickets charge")
 
@@ -271,20 +323,138 @@ class TicketsCog(commands.Cog):
         async with channel.typing():
             return await asyncio.to_thread(func, *args)
 
-    def _ticket_control_labels(self, guild_config: dict | None, assigned_name: str | None = None, status: str | None = None) -> dict[str, str]:
+    def _default_button_text(self, key: str, language: str, **variables) -> str:
+        lang = _normalize_lang(language, "en")
+        template = TICKET_BUTTON_TEXTS.get(key, {}).get(lang) or TICKET_BUTTON_TEXTS.get(key, {}).get("en") or key
+        return _render_template(template, variables)
+
+    def _translate_button_text(self, text: str, target_language: str, fallback_language: str) -> str:
+        raw = (text or "").strip()
+        if not raw:
+            return raw
+
+        target = _normalize_lang(target_language, "en")
+        source = self.translator.detect_language(raw) or _normalize_lang(fallback_language, "en")
+        if source == target:
+            return raw
+
+        cache_key = (raw, source, target)
+        cached = self._label_translation_cache.get(cache_key)
+        if cached:
+            return cached
+
+        try:
+            translated, _ = self.translator.translate(raw, source, target)
+        except Exception:
+            translated = raw
+        translated = (translated or raw).strip() or raw
+        self._label_translation_cache[cache_key] = translated
+        return translated
+
+    def _resolve_ticket_button_label(
+        self,
+        *,
+        key: str,
+        guild_config: dict | None,
+        target_language: str,
+        fallback_language: str,
+        assigned_name: str | None = None,
+        status: str | None = None,
+    ) -> str:
         cfg = guild_config or {}
-        take_base = (cfg.get("ticket_take_label") or "").strip() or "S'approprier le ticket"
-        close_base = (cfg.get("ticket_close_label") or "").strip() or "Fermer le ticket"
-        reopen_base = (cfg.get("ticket_reopen_label") or "").strip() or "Réouvrir"
-        transcript_base = (cfg.get("ticket_transcript_label") or "").strip() or "Transcript"
         current_status = (status or "open").strip().lower()
-        take_label = take_base if not assigned_name else f"Pris par {assigned_name[:20]}"
-        close_label = "Confirmer la fermeture" if current_status == "pending_close" else close_base
+
+        if key == "take" and assigned_name:
+            return self._default_button_text("taken_by", target_language, name=assigned_name[:20])
+        if key == "close" and current_status == "pending_close":
+            return self._default_button_text("confirm_close", target_language)
+
+        custom_map = {
+            "take": (cfg.get("ticket_take_label") or "").strip(),
+            "close": (cfg.get("ticket_close_label") or "").strip(),
+            "reopen": (cfg.get("ticket_reopen_label") or "").strip(),
+            "transcript": (cfg.get("ticket_transcript_label") or "").strip(),
+        }
+        custom_value = custom_map.get(key) or ""
+        if custom_value:
+            return self._translate_button_text(custom_value, target_language, fallback_language)
+
+        return self._default_button_text(key, target_language)
+
+    def _combine_shared_button_label(self, primary: str, secondary: str) -> str:
+        a = (primary or "").strip()
+        b = (secondary or "").strip()
+        if not a:
+            return b[:80]
+        if not b or a.casefold() == b.casefold():
+            return a[:80]
+        combined = f"{a} / {b}"
+        if len(combined) <= 80:
+            return combined
+        return f"{a[:38].rstrip()} / {b[:38].rstrip()}"[:80]
+
+    def _ticket_control_labels(
+        self,
+        guild_config: dict | None,
+        assigned_name: str | None = None,
+        status: str | None = None,
+        user_language: str | None = None,
+        staff_language: str | None = None,
+    ) -> dict[str, str]:
+        cfg = guild_config or {}
+        staff_lang = _normalize_lang(staff_language or cfg.get("default_language"), "en")
+        user_lang = _normalize_lang(user_language, staff_lang)
+        current_status = (status or "open").strip().lower()
+
+        take_label = self._resolve_ticket_button_label(
+            key="take",
+            guild_config=cfg,
+            target_language=staff_lang,
+            fallback_language=staff_lang,
+            assigned_name=assigned_name,
+            status=current_status,
+        )
+        close_user = self._resolve_ticket_button_label(
+            key="close",
+            guild_config=cfg,
+            target_language=user_lang,
+            fallback_language=staff_lang,
+            status=current_status,
+        )
+        close_staff = self._resolve_ticket_button_label(
+            key="close",
+            guild_config=cfg,
+            target_language=staff_lang,
+            fallback_language=staff_lang,
+            status=current_status,
+        )
+        reopen_label = self._resolve_ticket_button_label(
+            key="reopen",
+            guild_config=cfg,
+            target_language=staff_lang,
+            fallback_language=staff_lang,
+            status=current_status,
+        )
+        transcript_user = self._resolve_ticket_button_label(
+            key="transcript",
+            guild_config=cfg,
+            target_language=user_lang,
+            fallback_language=staff_lang,
+            status=current_status,
+        )
+        transcript_staff = self._resolve_ticket_button_label(
+            key="transcript",
+            guild_config=cfg,
+            target_language=staff_lang,
+            fallback_language=staff_lang,
+            status=current_status,
+        )
+
         return {
             "take": take_label[:80],
-            "close": close_label[:80],
-            "reopen": reopen_base[:80],
-            "transcript": transcript_base[:80],
+            "close": self._combine_shared_button_label(close_user, close_staff),
+            "reopen": reopen_label[:80],
+            "transcript": self._combine_shared_button_label(transcript_user, transcript_staff),
         }
 
     def _message_render_for_language(self, msg: dict, target_lang: str | None) -> str:
@@ -1295,10 +1465,16 @@ class TicketControlView(discord.ui.View):
         assigned_name = (ticket.get("assigned_staff_name") or "").strip()
         guild_config = GuildModel.get(int(ticket.get("guild_id") or 0)) or {}
         cog = self.bot.get_cog("TicketsCog")
-        labels = cog._ticket_control_labels(guild_config, assigned_name, status) if cog else {
-            "take": "S'approprier le ticket",
+        labels = cog._ticket_control_labels(
+            guild_config,
+            assigned_name,
+            status,
+            ticket.get("user_language"),
+            ticket.get("staff_language"),
+        ) if cog else {
+            "take": "Prendre le ticket",
             "close": "Fermer le ticket",
-            "reopen": "Réouvrir",
+            "reopen": "Reouvrir",
             "transcript": "Transcript",
         }
 
