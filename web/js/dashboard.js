@@ -299,19 +299,12 @@ function renderDashboard() {
   // CDC: navigation et pages réservées au Super Admin
   toggleSuperAdminNav(isSuper);
 
-  // CDC: masquer les pages réservées au Super Admin pour les utilisateurs lambda
-  // Utilisateur lambda : uniquement Tickets + Settings
-  const superOnlyPages = ["page-dashboard", "page-orders", "page-kb"];
+  // Pages réservées à l'admin global uniquement.
+  const superOnlyPages = ["page-dashboard", "page-superadmin"];
   superOnlyPages.forEach((id) => {
     const el = document.getElementById(id);
     if (el) el.style.display = isSuper ? "" : "none";
   });
-
-  // CDC: masquer le bouton Upgrader (redirige vers Orders, réservé Super Admin)
-  const upgradeBtnLegacy = document.querySelector(".btn[onclick*=\"orders\"]");
-  if (upgradeBtnLegacy) upgradeBtnLegacy.style.display = isSuper ? "" : "none";
-  const upgradeBtn = document.getElementById("settings-upgrade-btn");
-  if (upgradeBtn) upgradeBtn.style.display = isSuper ? "" : "none";
 
   // Charger la page par défaut selon le rôle
   const defaultPage = isSuper ? "dashboard" : "tickets";
@@ -476,10 +469,8 @@ function initNav() {
 }
 
 function navigateTo(page) {
-  // CDC: utilisateur lambda = non super-admin
-  // Pages réservées au Super Admin : dashboard (global), orders, kb, superadmin
   const isSuper = !!state.user?.is_super_admin;
-  if (!isSuper && ["dashboard", "orders", "kb", "superadmin"].includes(page)) page = "tickets";
+  if (!isSuper && ["dashboard", "superadmin"].includes(page)) page = "tickets";
 
   state.currentPage = page;
 
@@ -508,7 +499,7 @@ function navigateTo(page) {
   // Charger les données de la page
   if (state.token && state.currentGuild) {
     if (page === "tickets") loadTickets();
-    if (page === "orders" && state.user?.is_super_admin) loadOrders();
+    if (page === "orders") loadOrders();
     if (page === "settings") loadSettings();
     if (page === "kb") loadKB();
     if (page === "dashboard") loadDashboardStats();
@@ -1064,11 +1055,45 @@ async function reopenTicket(ticketId) {
 // ─────────────────────────────────────────────────────────────
 
 async function loadOrders() {
+  if (!state.currentGuild) return;
+
+  const planEl = document.getElementById("billing-current-plan");
+  const priceEl = document.getElementById("billing-current-price");
+  const statusEl = document.getElementById("billing-current-status");
+  const noteEl = document.getElementById("billing-plan-note");
+
+  if (planEl) planEl.textContent = "—";
+  if (priceEl) priceEl.textContent = "";
+  if (statusEl) statusEl.textContent = typeof t === "function" ? t("dash_loading") : "Chargement…";
+
   try {
-    const data = await apiFetch(`/dashboard/orders/pending`, { auth: true });
-    renderOrders(data.orders || []);
+    const stats = await apiFetch(`/internal/guild/${state.currentGuild.id}/stats`, { auth: true });
+    const plan = String(stats.current_plan || "free").toLowerCase();
+    state.guildMeta[state.currentGuild.id] = { ...(state.guildMeta[state.currentGuild.id] || {}), plan };
+    updateServerPlanDisplay();
+
+    if (planEl) planEl.textContent = formatPlanLabel(plan);
+    if (priceEl) {
+      priceEl.textContent =
+        plan === "premium" ? "— 2€/mois" :
+        plan === "pro" ? "— 5€/mois" :
+        "— 0€/mois";
+    }
+    if (statusEl) {
+      statusEl.className = `pill ${plan === "free" ? "free" : plan === "premium" ? "premium" : "pro"}`;
+      statusEl.textContent = formatPlanLabel(plan);
+    }
+    if (noteEl) {
+      noteEl.textContent = plan === "free"
+        ? "Passez à Premium ou Pro depuis le site pour débloquer plus de tickets, de langues et d'options."
+        : "Votre serveur dispose déjà d'un abonnement actif. Vous pouvez le renouveler ou le faire évoluer depuis le site.";
+    }
   } catch (e) {
-    console.warn("Orders:", e.message);
+    if (statusEl) {
+      statusEl.className = "pill rejected";
+      statusEl.textContent = "Indisponible";
+    }
+    console.warn("Billing:", e.message);
   }
 }
 

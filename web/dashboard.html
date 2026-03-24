@@ -125,13 +125,12 @@
         <span data-i18n="dash_tickets">Tickets</span>
         <span class="nav-badge" data-badge="tickets">—</span>
       </div>
-      <div class="nav-item" data-page="orders" data-super-admin style="display:none">
+      <div class="nav-item" data-page="orders">
         <svg class="nav-icon" viewBox="0 0 14 14" fill="none">
           <rect x="1.5" y="1.5" width="11" height="11" rx="1.5" fill="currentColor" opacity=".3"/>
           <path d="M4 5h6M4 7h4M4 9h2.5" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
         </svg>
-        <span data-i18n="dash_orders">Orders</span>
-        <span class="nav-badge yellow" data-badge="orders">—</span>
+        <span data-i18n="dash_billing">Abonnement</span>
       </div>
     </div>
 
@@ -147,7 +146,7 @@
         </svg>
         <span data-i18n="dash_settings">Settings</span>
       </div>
-      <div class="nav-item" data-page="kb" data-super-admin style="display:none">
+      <div class="nav-item" data-page="kb">
         <svg class="nav-icon" viewBox="0 0 14 14" fill="none">
           <path d="M2.5 2h6.5l2.5 2.5V12a.5.5 0 01-.5.5h-8.5A.5.5 0 012 12V2.5A.5.5 0 012.5 2z" fill="currentColor" opacity=".4"/>
           <path d="M4.5 6.5h5M4.5 8.5h3.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/>
@@ -383,106 +382,84 @@
 
       <div class="page-header">
         <div>
-          <div class="page-title" data-i18n="dash_orders">Orders</div>
-          <div class="page-sub" data-i18n="dash_orders_sub">Commandes en attente de validation manuelle</div>
-        </div>
-        <div class="page-actions">
-          <button class="btn btn-ghost btn-sm" data-action="refresh-orders" type="button" style="display:inline-flex;align-items:center;gap:6px">
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-              <path d="M21 12a9 9 0 1 1-2.64-6.36" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-              <path d="M21 4v6h-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-            </svg>
-            <span data-i18n="dash_refresh">Rafraîchir</span>
-          </button>
+          <div class="page-title" data-i18n="dash_billing">Abonnement</div>
+          <div class="page-sub" data-i18n="dash_billing_sub">Plans et moyens de paiement disponibles pour votre serveur</div>
         </div>
       </div>
 
       <div class="grid-2">
         <div class="card">
           <div class="card-header">
-            <div class="card-title"><div class="card-dot"></div><span data-i18n="dash_pending">En attente</span></div>
-            <button class="btn btn-ghost btn-sm btn-xs" data-action="refresh-orders" type="button" aria-label="Rafraîchir" style="display:inline-flex;align-items:center;justify-content:center">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" aria-hidden="true">
-                <path d="M21 12a9 9 0 1 1-2.64-6.36" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
-                <path d="M21 4v6h-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-              </svg>
-            </button>
+            <div class="card-title"><div class="card-dot"></div><span data-i18n="dash_billing_current">Abonnement actuel</span></div>
           </div>
-          <div class="card-body" id="orders-list">
-            <div style="color:var(--text3);font-size:13px;text-align:center;padding:24px" data-i18n="dash_loading">Chargement…</div>
+          <div class="card-body">
+            <div class="billing-hero">
+              <div>
+                <div class="billing-kicker" data-i18n="dash_current_plan">PLAN ACTUEL</div>
+                <div class="billing-plan-line">
+                  <span id="billing-current-plan">—</span>
+                  <span id="billing-current-price"></span>
+                </div>
+              </div>
+              <span class="pill free" id="billing-current-status" data-i18n="dash_loading">Chargement…</span>
+            </div>
+            <p class="billing-note" id="billing-plan-note" data-i18n="dash_billing_note">
+              Choisissez un plan sur le site puis utilisez le moyen de paiement qui vous convient.
+            </p>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <a class="btn btn-primary btn-sm" href="index.html#pricing" data-i18n="dash_view_plans">Voir les plans</a>
+              <a class="btn btn-ghost btn-sm" href="index.html#payments" data-i18n="dash_view_payment_methods">Voir les paiements</a>
+            </div>
           </div>
         </div>
 
         <div class="card">
           <div class="card-header">
-            <div class="card-title"><div class="card-dot"></div><span data-i18n="dash_legend">Légende</span></div>
+            <div class="card-title"><div class="card-dot"></div><span data-i18n="section_payments_title">Payez comme vous voulez</span></div>
           </div>
           <div class="card-body">
-            <div style="display:flex;flex-direction:column;gap:10px">
-              <div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--surface);border-radius:8px;border:1px solid var(--border2)">
-                <div aria-hidden="true">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="12" cy="12" r="9"></circle>
-                    <path d="M8 12l3 3 5-6"></path>
-                  </svg>
-                </div>
-                <div>
-                  <div style="font-size:12.5px;font-weight:600;color:var(--accent)" data-i18n="dash_paid">Payé</div>
-                  <div style="font-size:11px;color:var(--text3)" data-i18n="dash_order_paid_desc">Active le plan, notifie l'utilisateur en DM</div>
-                </div>
+            <div class="billing-methods">
+              <div class="billing-method-card">
+                <div class="billing-method-title" data-i18n="payment_crypto">Crypto (OxaPay)</div>
+                <div class="billing-method-meta" data-i18n="payment_methods">BTC · ETH · USDT · LTC et plus via OxaPay</div>
+                <span class="pill paid" data-i18n="payment_crypto_status">AUTO</span>
               </div>
-              <div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--surface);border-radius:8px;border:1px solid var(--border2)">
-                <div aria-hidden="true">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="M12 3l9 16H3z"></path>
-                    <path d="M12 10v4"></path>
-                    <circle cx="12" cy="17" r="1"></circle>
-                  </svg>
-                </div>
-                <div>
-                  <div style="font-size:12.5px;font-weight:600;color:var(--yellow)" data-i18n="dash_amount_incomplete">Montant incomplet</div>
-                  <div style="font-size:11px;color:var(--text3)" data-i18n="dash_dm_send_rest">DM à l'utilisateur pour envoyer le reste</div>
-                </div>
+              <div class="billing-method-card">
+                <div class="billing-method-title" data-i18n="payment_paypal">PayPal</div>
+                <div class="billing-method-meta" data-i18n="dash_payment_paypal_desc">Validation manuelle par l'équipe admin</div>
+                <span class="pill pending" data-i18n="payment_paypal_status">MANUEL</span>
               </div>
-              <div style="display:flex;align-items:center;gap:10px;padding:10px;background:var(--surface);border-radius:8px;border:1px solid var(--border2)">
-                <div aria-hidden="true">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="12" cy="12" r="9"></circle>
-                    <path d="M9 9l6 6M15 9l-6 6"></path>
-                  </svg>
-                </div>
-                <div>
-                  <div style="font-size:12.5px;font-weight:600;color:var(--red)" data-i18n="dash_rejected">Rejeté</div>
-                  <div style="font-size:11px;color:var(--text3)" data-i18n="dash_order_rejected_desc">Annule la commande, notifie l'utilisateur</div>
-                </div>
+              <div class="billing-method-card">
+                <div class="billing-method-title" data-i18n="payment_gift">Carte cadeau</div>
+                <div class="billing-method-meta" data-i18n="dash_payment_gift_desc">Validation manuelle après vérification du code</div>
+                <span class="pill pending" data-i18n="payment_gift_status">MANUEL</span>
               </div>
             </div>
-            <div style="margin-top:16px;padding:12px;background:var(--accent-dim2);border:1px solid rgba(45,255,143,0.1);border-radius:8px">
-              <div style="font-size:10px;font-family:'Space Mono',monospace;color:var(--accent);margin-bottom:6px;display:flex;align-items:center;gap:6px">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><path d="M12 16v-4"></path><path d="M12 8h.01"></path></svg>
-                <span data-i18n="dash_reminder">RAPPEL</span>
+            <div class="billing-note-card">
+              <div class="billing-kicker" data-i18n="dash_payment_flow_title">Comment payer</div>
+              <div style="font-size:11.5px;color:var(--text2);line-height:1.6" data-i18n="dash_payment_flow_desc">
+                Les moyens de paiement disponibles et opérationnels sont ceux affichés sur le site. Après paiement, l'activation est automatique en crypto ou validée par l'équipe admin pour les méthodes manuelles.
               </div>
-              <div style="font-size:11.5px;color:var(--text2);line-height:1.5" data-i18n="dash_orders_reminder">Chaque action envoie automatiquement un DM Discord à l'utilisateur via le bot.</div>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- Historique -->
-      <div class="card">
-        <div class="card-header">
-          <div class="card-title"><div class="card-dot"></div><span data-i18n="dash_recent_history">Historique récent</span></div>
-          <div class="card-meta" data-i18n="dash_last_30_days">30 DERNIERS JOURS</div>
+      <div class="pricing-grid-dashboard">
+        <div class="billing-plan-card">
+          <div class="billing-plan-name">Free</div>
+          <div class="billing-plan-price">0€<span>/mois</span></div>
+          <p data-i18n="plan_free_desc">Pour tester Veridian AI sur votre serveur.</p>
         </div>
-        <div class="card-body no-pad">
-          <table class="data-table" id="orders-history">
-            <thead>
-              <tr><th data-i18n="dash_order_id">Order ID</th><th data-i18n="dash_user">Utilisateur</th><th data-i18n="dash_method">Méthode</th><th data-i18n="dash_plan">Plan</th><th data-i18n="dash_amount">Montant</th><th data-i18n="dash_status">Statut</th><th data-i18n="dash_date">Date</th></tr>
-            </thead>
-            <tbody>
-              <tr><td colspan="7" style="text-align:center;color:var(--text3);padding:24px" data-i18n="dash_loading_history">Chargement de l'historique…</td></tr>
-            </tbody>
-          </table>
+        <div class="billing-plan-card featured">
+          <div class="billing-plan-name">Premium</div>
+          <div class="billing-plan-price">2€<span>/mois</span></div>
+          <p data-i18n="plan_premium_desc">Pour les communautés actives avec un support international.</p>
+        </div>
+        <div class="billing-plan-card">
+          <div class="billing-plan-name">Pro</div>
+          <div class="billing-plan-price">5€<span>/mois</span></div>
+          <p data-i18n="plan_pro_desc">Pour les serveurs à fort volume avec des besoins avancés.</p>
         </div>
       </div>
     </div>
@@ -800,6 +777,14 @@
         </div>
         <div class="page-actions">
           <button class="btn btn-primary btn-sm" id="kb-add-btn" data-i18n="dash_kb_add">+ Ajouter une entrée</button>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-body">
+          <div style="font-size:12.5px;color:var(--text2);line-height:1.7" data-i18n="dash_kb_guidelines">
+            Tout le monde peut ajouter des informations utiles dans la langue qu'il veut. Les admins peuvent ensuite nettoyer les entrées inutiles pour garder une base claire pour l'IA.
+          </div>
         </div>
       </div>
 
