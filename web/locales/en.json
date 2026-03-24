@@ -144,6 +144,7 @@
   "dash_admin": "Admin",
   "dash_group_main": "Main",
   "dash_group_config": "Config",
+  "dash_group_server_config": "Server config",
   "dash_group_superadmin": "Admin",
   "dash_group_admin": "Admin",
   "dash_loading": "Loading…",

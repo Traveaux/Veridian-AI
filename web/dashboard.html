@@ -183,26 +183,26 @@
         </svg>
         <span data-i18n="dash_billing">Abonnement</span>
       </div>
-    </div>
-
-    <div class="nav-sep"></div>
-
-    <!-- Nav: Config -->
-    <div class="nav-group">
-      <span class="nav-group-label" data-i18n="dash_group_config">Config</span>
-      <div class="nav-item" data-page="settings">
-        <svg class="nav-icon" viewBox="0 0 14 14" fill="none">
-          <circle cx="7" cy="7" r="2" fill="currentColor"/>
-          <path d="M7 1.5v1.2M7 11.3v1.2M1.5 7h1.2M11.3 7h1.2M3.1 3.1l.85.85M10.05 10.05l.85.85M3.1 10.9l.85-.85M10.05 3.95l.85-.85" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
-        </svg>
-        <span data-i18n="dash_settings">Settings</span>
-      </div>
       <div class="nav-item" data-page="kb">
         <svg class="nav-icon" viewBox="0 0 14 14" fill="none">
           <path d="M2.5 2h6.5l2.5 2.5V12a.5.5 0 01-.5.5h-8.5A.5.5 0 012 12V2.5A.5.5 0 012.5 2z" fill="currentColor" opacity=".4"/>
           <path d="M4.5 6.5h5M4.5 8.5h3.5" stroke="currentColor" stroke-width="1.1" stroke-linecap="round"/>
         </svg>
         <span data-i18n="dash_kb">Knowledge Base</span>
+      </div>
+    </div>
+
+    <div class="nav-sep"></div>
+
+    <!-- Nav: Config -->
+    <div class="nav-group">
+      <span class="nav-group-label" data-i18n="dash_group_server_config">Config serveur</span>
+      <div class="nav-item" data-page="settings">
+        <svg class="nav-icon" viewBox="0 0 14 14" fill="none">
+          <circle cx="7" cy="7" r="2" fill="currentColor"/>
+          <path d="M7 1.5v1.2M7 11.3v1.2M1.5 7h1.2M11.3 7h1.2M3.1 3.1l.85.85M10.05 10.05l.85.85M3.1 10.9l.85-.85M10.05 3.95l.85-.85" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/>
+        </svg>
+        <span data-i18n="dash_settings">Settings</span>
       </div>
     </div>
 
@@ -716,80 +716,114 @@
               <div class="card-title"><div class="card-dot"></div><span>Comportement &amp; messages</span></div>
             </div>
             <div class="card-body">
-              <div class="form-group">
-                <label class="form-label">Message bienvenue utilisateur</label>
-                <textarea class="form-input" id="settings-ticket-welcome-message-user" rows="4" placeholder="Hello {user_mention}, tell us what happened and we will translate everything for you." style="resize:vertical;font-family:'DM Sans',sans-serif"></textarea>
-                <div style="font-size:10px;color:var(--text3);margin-top:4px">Fallback auto: anglais si la langue utilisateur est inconnue, sinon langue détectée/définie.</div>
-              </div>
-              <div class="form-group">
-                <label class="form-label">Message bienvenue staff</label>
-                <textarea class="form-input" id="settings-ticket-welcome-message-staff" rows="4" placeholder="Staff note: reply in {staff_language}. Assigned: {assigned_staff}." style="resize:vertical;font-family:'DM Sans',sans-serif"></textarea>
-                <div style="font-size:10px;color:var(--text3);margin-top:4px">Variables: <code>{ticket_id}</code> <code>{user_mention}</code> <code>{user_language}</code> <code>{staff_language}</code> <code>{assigned_staff}</code> <code>{status}</code></div>
-              </div>
-              <div class="form-group">
-                <label class="form-label">Couleur embed bienvenue</label>
-                <select class="form-select" id="settings-ticket-welcome-color">
-                  <option value="#4DA6FF">Bleu</option>
-                  <option value="#2DFF8F">Vert</option>
-                  <option value="#FFB84D">Jaune</option>
-                  <option value="#FF5050">Rouge</option>
-                  <option value="#A855F7">Violet</option>
-                </select>
-              </div>
-              <div class="form-group">
-                <label class="form-label">Prévisualisation embed</label>
-                <div id="settings-ticket-welcome-preview" style="background:var(--surface);border:1px solid var(--border2);border-radius:10px;padding:12px 14px">
-                  <div style="font-size:10px;font-family:'Space Mono',monospace;color:var(--text3);letter-spacing:.08em;margin-bottom:8px">APERÇU</div>
-                  <div id="settings-ticket-welcome-preview-user" style="white-space:pre-wrap;color:var(--text);font-size:12.5px;line-height:1.6;margin-bottom:10px">—</div>
-                  <div style="height:1px;background:var(--border);margin:10px 0"></div>
-                  <div id="settings-ticket-welcome-preview-staff" style="white-space:pre-wrap;color:var(--text2);font-size:12.5px;line-height:1.6">—</div>
+              <div class="settings-subcard">
+                <div class="settings-subcard-header">
+                  <div>
+                    <div class="settings-subcard-title">Messages de bienvenue</div>
+                    <div class="settings-subcard-desc">Vous gardez deux messages séparés, un pour l'utilisateur et un pour le staff, avec aperçu immédiat.</div>
+                  </div>
+                </div>
+                <div class="settings-compact-grid">
+                  <div class="form-group">
+                    <label class="form-label">Message bienvenue utilisateur</label>
+                    <textarea class="form-input" id="settings-ticket-welcome-message-user" rows="4" placeholder="Hello {user_mention}, tell us what happened and we will translate everything for you." style="resize:vertical;font-family:'DM Sans',sans-serif"></textarea>
+                    <div style="font-size:10px;color:var(--text3);margin-top:4px">Fallback auto: anglais si la langue utilisateur est inconnue, sinon langue détectée/définie.</div>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Message bienvenue staff</label>
+                    <textarea class="form-input" id="settings-ticket-welcome-message-staff" rows="4" placeholder="Staff note: reply in {staff_language}. Assigned: {assigned_staff}." style="resize:vertical;font-family:'DM Sans',sans-serif"></textarea>
+                    <div style="font-size:10px;color:var(--text3);margin-top:4px">Variables: <code>{ticket_id}</code> <code>{user_mention}</code> <code>{user_language}</code> <code>{staff_language}</code> <code>{assigned_staff}</code> <code>{status}</code></div>
+                  </div>
+                </div>
+                <div class="settings-compact-grid settings-compact-grid-tight">
+                  <div class="form-group">
+                    <label class="form-label">Couleur embed bienvenue</label>
+                    <select class="form-select" id="settings-ticket-welcome-color">
+                      <option value="#4DA6FF">Bleu</option>
+                      <option value="#2DFF8F">Vert</option>
+                      <option value="#FFB84D">Jaune</option>
+                      <option value="#FF5050">Rouge</option>
+                      <option value="#A855F7">Violet</option>
+                    </select>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Prévisualisation embed</label>
+                    <div id="settings-ticket-welcome-preview" class="settings-preview-panel">
+                      <div style="font-size:10px;font-family:'Space Mono',monospace;color:var(--text3);letter-spacing:.08em;margin-bottom:8px">APERÇU</div>
+                      <div id="settings-ticket-welcome-preview-user" style="white-space:pre-wrap;color:var(--text);font-size:12.5px;line-height:1.6;margin-bottom:10px">—</div>
+                      <div style="height:1px;background:var(--border);margin:10px 0"></div>
+                      <div id="settings-ticket-welcome-preview-staff" style="white-space:pre-wrap;color:var(--text2);font-size:12.5px;line-height:1.6">—</div>
+                    </div>
+                  </div>
                 </div>
               </div>
-              <div class="form-group">
-                <label class="form-label">Libellé bouton prise en charge</label>
-                <input class="form-input" id="settings-ticket-take-label" type="text" placeholder="S'approprier le ticket">
-              </div>
-              <div class="form-group">
-                <label class="form-label">Libellé bouton fermeture</label>
-                <input class="form-input" id="settings-ticket-close-label" type="text" placeholder="Fermer le ticket">
-              </div>
-              <div class="form-group">
-                <label class="form-label">Libellé bouton réouverture</label>
-                <input class="form-input" id="settings-ticket-reopen-label" type="text" placeholder="Réouvrir">
-              </div>
-              <div class="form-group">
-                <label class="form-label">Libellé bouton transcript</label>
-                <input class="form-input" id="settings-ticket-transcript-label" type="text" placeholder="Transcript">
-              </div>
-              <div class="toggle-row">
-                <div class="toggle-info">
-                  <div class="toggle-name">Mentionner le staff à l'ouverture</div>
-                  <div class="toggle-desc">Ping du rôle staff dans le channel de ticket</div>
+
+              <div class="settings-subcard">
+                <div class="settings-subcard-header">
+                  <div>
+                    <div class="settings-subcard-title">Actions et traductions</div>
+                    <div class="settings-subcard-desc">Les boutons utiles au staff suivent la langue staff, ceux visibles côté utilisateur suivent la sienne, avec fallback sur vos libellés personnalisés.</div>
+                  </div>
                 </div>
-                <div class="toggle-switch" id="toggle-ticket-mention-staff" data-setting-key="ticket_mention_staff"></div>
-              </div>
-              <div class="toggle-row">
-                <div class="toggle-info">
-                  <div class="toggle-name">Fermer si l'utilisateur quitte le serveur</div>
-                  <div class="toggle-desc">Clôture automatique (optionnel)</div>
+                <div class="settings-compact-grid settings-compact-grid-tight">
+                  <div class="form-group">
+                    <label class="form-label">Libellé bouton prise en charge</label>
+                    <input class="form-input" id="settings-ticket-take-label" type="text" placeholder="S'approprier le ticket">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Libellé bouton fermeture</label>
+                    <input class="form-input" id="settings-ticket-close-label" type="text" placeholder="Fermer le ticket">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Libellé bouton réouverture</label>
+                    <input class="form-input" id="settings-ticket-reopen-label" type="text" placeholder="Réouvrir">
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Libellé bouton transcript</label>
+                    <input class="form-input" id="settings-ticket-transcript-label" type="text" placeholder="Transcript">
+                  </div>
                 </div>
-                <div class="toggle-switch" id="toggle-ticket-close-on-leave" data-setting-key="ticket_close_on_leave"></div>
-              </div>
-              <div class="form-group">
-                <label class="form-label">Max tickets ouverts / utilisateur</label>
-                <input class="form-input" id="settings-ticket-max-open" type="number" min="0" step="1" placeholder="1">
-                <div style="font-size:10px;color:var(--text3);margin-top:4px">0 = illimité</div>
-              </div>
-              <div class="toggle-row">
-                <div class="toggle-info">
-                  <div class="toggle-name">Traduction dans les tickets</div>
-                  <div class="toggle-desc">Utilise le switch global "Traduction automatique"</div>
+                <div class="toggle-row">
+                  <div class="toggle-info">
+                    <div class="toggle-name">Mentionner le staff à l'ouverture</div>
+                    <div class="toggle-desc">Ping du rôle staff dans le channel de ticket</div>
+                  </div>
+                  <div class="toggle-switch" id="toggle-ticket-mention-staff" data-setting-key="ticket_mention_staff"></div>
                 </div>
-                <div class="toggle-switch" style="opacity:.4;pointer-events:none" data-setting-key="auto_translate"></div>
+                <div class="toggle-row">
+                  <div class="toggle-info">
+                    <div class="toggle-name">Traduction dans les tickets</div>
+                    <div class="toggle-desc">Utilise le switch global "Traduction automatique"</div>
+                  </div>
+                  <div class="toggle-switch" style="opacity:.4;pointer-events:none" data-setting-key="auto_translate"></div>
+                </div>
               </div>
-              <div class="form-group">
-                <label class="form-label">Langues du staff (JSON)</label>
-                <textarea class="form-input" id="settings-staff-languages" rows="5" placeholder='[{"user_id":123,"username":"Mod","language":"fr"}]' style="resize:vertical;font-family:'Space Mono',monospace"></textarea>
+
+              <div class="settings-subcard">
+                <div class="settings-subcard-header">
+                  <div>
+                    <div class="settings-subcard-title">Règles d'exploitation</div>
+                    <div class="settings-subcard-desc">Même options qu'avant, mais regroupées pour garder la section lisible.</div>
+                  </div>
+                </div>
+                <div class="toggle-row">
+                  <div class="toggle-info">
+                    <div class="toggle-name">Fermer si l'utilisateur quitte le serveur</div>
+                    <div class="toggle-desc">Clôture automatique (optionnel)</div>
+                  </div>
+                  <div class="toggle-switch" id="toggle-ticket-close-on-leave" data-setting-key="ticket_close_on_leave"></div>
+                </div>
+                <div class="settings-compact-grid settings-compact-grid-tight">
+                  <div class="form-group">
+                    <label class="form-label">Max tickets ouverts / utilisateur</label>
+                    <input class="form-input" id="settings-ticket-max-open" type="number" min="0" step="1" placeholder="1">
+                    <div style="font-size:10px;color:var(--text3);margin-top:4px">0 = illimité</div>
+                  </div>
+                  <div class="form-group">
+                    <label class="form-label">Langues du staff (JSON)</label>
+                    <textarea class="form-input" id="settings-staff-languages" rows="5" placeholder='[{"user_id":123,"username":"Mod","language":"fr"}]' style="resize:vertical;font-family:'Space Mono',monospace"></textarea>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
