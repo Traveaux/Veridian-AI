@@ -56,6 +56,11 @@ function applyTranslations(translations) {
     if (translations[key]) el.title = translations[key];
   });
 
+  document.querySelectorAll('[data-i18n-aria-label]').forEach(el => {
+    const key = el.dataset.i18nAriaLabel;
+    if (translations[key]) el.setAttribute('aria-label', translations[key]);
+  });
+
   document.querySelectorAll('[data-i18n-value]').forEach(el => {
     const key = el.dataset.i18nValue;
     if (translations[key]) el.value = translations[key];
