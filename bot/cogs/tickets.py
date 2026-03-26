@@ -17,6 +17,9 @@ from bot.config import DB_TABLE_PREFIX
 from bot.services.translator import TranslatorService
 from bot.services.groq_client import GroqClient
 from bot.config import TICKET_CHANNEL_PREFIX, BOT_OWNER_DISCORD_ID
+from bot.config import COLOR_SUCCESS, COLOR_NOTICE, COLOR_WARNING, COLOR_CRITICAL
+from bot.config import EMOJI_AI_API, EMOJI_AI_CACHE, EMOJI_ADMIN, EMOJI_TICKET, EMOJI_WARNING
+from bot.config import EMOJI_URL_AI_API, EMOJI_URL_AI_CACHE, EMOJI_URL_ADMIN, EMOJI_URL_TICKET, EMOJI_URL_WARNING
 
 LANGUAGE_NAMES = {
     "fr": "Français", "en": "Anglais", "es": "Espagnol", 
@@ -57,7 +60,7 @@ def _parse_json(raw, default):
 def _embed_color(raw: str | None) -> discord.Color:
     n = (raw or "").strip().lower()
     if not n:
-        return discord.Color.blue()
+        return discord.Color(COLOR_SUCCESS)
 
     # Accept hex colors from dashboard (e.g. #4da6ff)
     if n.startswith("#") and len(n) in (4, 7):
@@ -66,16 +69,20 @@ def _embed_color(raw: str | None) -> discord.Color:
                 n = "#" + "".join([c * 2 for c in n[1:]])
             return discord.Color(int(n[1:], 16))
         except Exception:
-            return discord.Color.blue()
+            return discord.Color(COLOR_SUCCESS)
 
-    # Backward compatible named colors
+    # Nuanced Veridian colors
     return {
-        "blue": discord.Color.blue(),
-        "green": discord.Color.green(),
-        "red": discord.Color.red(),
-        "yellow": discord.Color.gold(),
-        "purple": discord.Color.purple(),
-    }.get(n, discord.Color.blue())
+        "blue": discord.Color(COLOR_SUCCESS),   # Now green for theme consistency
+        "green": discord.Color(COLOR_SUCCESS),
+        "red": discord.Color(COLOR_CRITICAL),
+        "yellow": discord.Color(COLOR_WARNING),
+        "purple": discord.Color(COLOR_NOTICE),
+        "success": discord.Color(COLOR_SUCCESS),
+        "notice": discord.Color(COLOR_NOTICE),
+        "warning": discord.Color(COLOR_WARNING),
+        "critical": discord.Color(COLOR_CRITICAL),
+    }.get(n, discord.Color(COLOR_SUCCESS))
 
 
 WELCOME_TEXTS = {
@@ -532,7 +539,7 @@ class TicketsCog(commands.Cog):
                         embed = discord.Embed(
                             title="Ticket fermé automatiquement",
                             description="Ce ticket a été fermé car il était inactif depuis plus de 3 jours.",
-                            color=discord.Color.orange()
+                            color=discord.Color(COLOR_NOTICE)
                         )
                         await channel.send(embed=embed)
                         # We trigger the close logic (summary, etc.)
@@ -629,10 +636,11 @@ class TicketsCog(commands.Cog):
         )
 
         embed = discord.Embed(
-            title="Ticket de Support",
+            title=f"{EMOJI_TICKET} Ticket de Support",
             color=_embed_color(cfg.get("ticket_welcome_color")),
             description="Le ticket est prêt. Utilisez les boutons ci-dessous pour l’assignation, la transcription et la clôture.",
         )
+        embed.set_thumbnail(url=EMOJI_URL_TICKET)
         embed.add_field(name="Message utilisateur", value=_truncate_block(_render_template(user_template, variables)), inline=False)
         embed.add_field(name="Note staff", value=_truncate_block(_render_template(staff_template, variables)), inline=False)
         embed.add_field(name="Ticket ID", value=f"`{ticket_id}`", inline=True)
@@ -749,10 +757,11 @@ class TicketsCog(commands.Cog):
 
         try:
             base_embed = discord.Embed(
-                title="Résumé du ticket (staff)",
+                title=f"{EMOJI_ADMIN} Résumé du ticket (staff)",
                 description=transcript_staff or "Aucun résumé généré.",
-                color=discord.Color.greyple(),
+                color=discord.Color(COLOR_NOTICE),
             )
+            base_embed.set_thumbnail(url=EMOJI_URL_ADMIN)
             base_embed.add_field(name="Priorité", value=f"`{pr_label}`", inline=True)
             base_embed.add_field(
                 name="Langues",
@@ -764,10 +773,11 @@ class TicketsCog(commands.Cog):
 
             if transcript_user and user_lang and user_lang != staff_lang:
                 user_embed = discord.Embed(
-                    title="Résumé du ticket (client)",
+                    title=f"{EMOJI_TICKET} Résumé du ticket (client)",
                     description=transcript_user,
-                    color=discord.Color.blurple(),
+                    color=discord.Color(COLOR_SUCCESS),
                 )
+                user_embed.set_thumbnail(url=EMOJI_URL_TICKET)
                 await channel.send(embed=user_embed)
         except Exception as e:
             logger.debug(f"Envoi resume fermeture ignore: {e}")
@@ -786,10 +796,11 @@ class TicketsCog(commands.Cog):
                         audience="user",
                     )
                     user_embed = discord.Embed(
-                        title="Résumé de votre ticket",
+                        title=f"{EMOJI_TICKET} Résumé de votre ticket",
                         description=transcript_user or transcript_staff or "Aucun résumé disponible.",
-                        color=discord.Color.blue(),
+                        color=discord.Color(COLOR_SUCCESS),
                     )
+                    user_embed.set_thumbnail(url=EMOJI_URL_TICKET)
                     user_embed.add_field(name="Assigné à", value=f"`{assigned_label}`", inline=True)
                     user_embed.add_field(
                         name="Fichier téléchargeable",
@@ -810,7 +821,7 @@ class TicketsCog(commands.Cog):
                 log_chan = self.bot.get_channel(log_channel_id) or await self.bot.fetch_channel(log_channel_id)
                 if log_chan:
                     meta = discord.Embed(
-                        title=f"Ticket Clôturé · #{ticket['id']}",
+                        title=f"{EMOJI_ADMIN} Ticket Clôturé · #{ticket['id']}",
                         description=(
                             f"**Utilisateur:** <@{ticket['user_id']}> ({ticket['user_username']})\n"
                             f"**Clôturé par:** {closer.mention}\n"
@@ -819,6 +830,7 @@ class TicketsCog(commands.Cog):
                         ),
                         color=discord.Color.dark_grey(),
                     )
+                    meta.set_thumbnail(url=EMOJI_URL_ADMIN)
                     meta.add_field(name="Priorité", value=f"`{pr_label}`", inline=True)
                     meta.add_field(name="Temps de réponse moyen", value=f"`{metrics.get('avg_response') or 'N/A'}`", inline=True)
                     meta.add_field(name="Durée totale", value=f"`{metrics.get('open_duration') or 'N/A'}`", inline=True)
@@ -951,8 +963,13 @@ class TicketsCog(commands.Cog):
                         color=discord.Color.blurple(),
                     )
                     embed.set_author(
-                        name=f"Traduction · {get_lang_name(user_lang)} → {get_lang_name(staff_lang)} ({'cache' if from_cache else 'api'})"
+                        name=(
+                            f"{EMOJI_AI_CACHE if from_cache else EMOJI_AI_API} Traduction · "
+                            f"{get_lang_name(user_lang)} → {get_lang_name(staff_lang)} · "
+                            f"{'backend (cache)' if from_cache else 'api'}"
+                        )
                     )
+                    embed.set_thumbnail(url=EMOJI_URL_AI_CACHE if from_cache else EMOJI_URL_AI_API)
                     await message.channel.send(embed=embed, reference=message, mention_author=False)
                     logger.debug(f"Traduction user->staff envoyee pour ticket {ticket['id']}")
                 except Exception as e:
@@ -962,7 +979,7 @@ class TicketsCog(commands.Cog):
             try:
                 if self.groq_client.detect_payment_intent(text):
                     payment_embed = discord.Embed(
-                        title="💎 Veridian AI - Plans & Tarifs",
+                        title=f"{EMOJI_TICKET} Veridian AI - Plans & Tarifs",
                         description=(
                             "Il semble que vous soyez intéressé par nos offres !\n\n"
                             "**✨ Plan Premium (5€/mois)**\n"
@@ -977,6 +994,7 @@ class TicketsCog(commands.Cog):
                         ),
                         color=discord.Color.gold()
                     )
+                    payment_embed.set_thumbnail(url=EMOJI_URL_TICKET)
                     payment_embed.set_footer(text="Paiement sécurisé via Carte ou Crypto (OxaPay)")
                     await message.channel.send(embed=payment_embed)
                     logger.info(f"Suggestion paiement envoyée pour ticket {ticket['id']}")
@@ -993,7 +1011,7 @@ class TicketsCog(commands.Cog):
                         if log_channel:
                             color = discord.Color.red() if security_status == "malicious" else discord.Color.orange()
                             alert_embed = discord.Embed(
-                                title="🛡️ Sécurité IA - Ticket",
+                                title=f"{EMOJI_WARNING} Sécurité IA - Ticket",
                                 description=(
                                     f"Détection **{security_status}** dans un ticket.\n\n"
                                     f"**Utilisateur:** {message.author.mention} (`{message.author.id}`)\n"
@@ -1002,6 +1020,8 @@ class TicketsCog(commands.Cog):
                                 ),
                                 color=color
                             )
+                            alert_embed.set_thumbnail(url=EMOJI_URL_WARNING)
+                            alert_embed.set_footer(text="Source: backend")
                             await log_channel.send(embed=alert_embed)
                             logger.warning(f"Alerte secu ticket ({security_status}) pour {message.author.id}")
             except Exception as e:
@@ -1093,8 +1113,13 @@ class TicketsCog(commands.Cog):
                     color=discord.Color.green(),
                 )
                 embed.set_author(
-                    name=f"Traduction · {get_lang_name(staff_src_lang)} → {get_lang_name(user_lang)} ({'cache' if from_cache else 'api'})"
+                    name=(
+                        f"{EMOJI_AI_CACHE if from_cache else EMOJI_AI_API} Traduction · "
+                        f"{get_lang_name(staff_src_lang)} → {get_lang_name(user_lang)} · "
+                        f"{'backend (cache)' if from_cache else 'api'}"
+                    )
                 )
+                embed.set_thumbnail(url=EMOJI_URL_AI_CACHE if from_cache else EMOJI_URL_AI_API)
                 await message.channel.send(embed=embed, reference=message, mention_author=False)
                 logger.debug(f"Traduction staff->user envoyee pour ticket {ticket['id']}")
             except Exception as e:
@@ -1635,10 +1660,11 @@ class TicketControlView(discord.ui.View):
                 audience="user" if interaction.user.id == int(ticket.get("user_id") or 0) else "staff",
             )
         embed = discord.Embed(
-            title=f"Transcript · Ticket #{self.ticket_id}",
+            title=f"{EMOJI_TICKET} Transcript · Ticket #{self.ticket_id}",
             description=(ticket.get("transcript") or "")[:4000],
             color=discord.Color.blurple(),
         )
+        embed.set_thumbnail(url=EMOJI_URL_TICKET)
         await interaction.response.send_message(embed=embed, ephemeral=True, file=file)
 
 
