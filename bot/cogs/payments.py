@@ -15,6 +15,9 @@ from bot.db.models import OrderModel, SubscriptionModel, PaymentModel, UserModel
 from bot.services.notifications import NotificationService
 from bot.services.oxapay import OxaPayClient
 from bot.config import BOT_OWNER_DISCORD_ID, PRICING, DASHBOARD_URL
+from bot.config import COLOR_SUCCESS, COLOR_NOTICE, COLOR_WARNING, COLOR_CRITICAL
+from bot.config import EMOJI_LOADING, EMOJI_TICKET
+from bot.config import EMOJI_URL_LOADING, EMOJI_URL_TICKET
 
 
 class PaymentsCog(commands.Cog):
@@ -103,8 +106,8 @@ class PaymentsCog(commands.Cog):
         paypal_email = os.getenv("PAYPAL_EMAIL", "[Email PayPal non configure]")
 
         embed = discord.Embed(
-            title="Paiement PayPal",
-            color=discord.Color.blue(),
+            title=f"{EMOJI_TICKET} Paiement PayPal",
+            color=discord.Color(COLOR_NOTICE),
             description=(
                 f"Plan : **{plan.upper()}** | Montant : **{amount:.2f} EUR**\n\n"
                 f"Envoyez **{amount:.2f} EUR** a : `{paypal_email}`\n"
@@ -113,6 +116,7 @@ class PaymentsCog(commands.Cog):
                 f"Suivi : {DASHBOARD_URL}"
             )
         )
+        embed.set_thumbnail(url=EMOJI_URL_TICKET)
         embed.set_footer(text="Sans la reference de commande, le paiement ne sera pas reconnu.")
 
         await interaction.followup.send(embed=embed, ephemeral=True)
@@ -128,13 +132,14 @@ class PaymentsCog(commands.Cog):
     async def _handle_giftcard(self, interaction: discord.Interaction,
                                 order_id: str, plan: str, amount: float):
         embed = discord.Embed(
-            title="Carte Cadeau",
-            color=discord.Color.green(),
+            title=f"{EMOJI_TICKET} Carte Cadeau",
+            color=discord.Color(COLOR_SUCCESS),
             description=(
                 f"Plan : **{plan.upper()}** | Montant : **{amount:.2f} EUR**\n\n"
                 "Vous allez recevoir un DM pour envoyer votre code et l'image de la carte."
             )
         )
+        embed.set_thumbnail(url=EMOJI_URL_TICKET)
         await interaction.followup.send(embed=embed, ephemeral=True)
 
         def check(msg: discord.Message):
@@ -175,7 +180,7 @@ class PaymentsCog(commands.Cog):
     async def _handle_crypto(self, interaction: discord.Interaction,
                               order_id: str, plan: str, amount: float):
         await interaction.followup.send(
-            "Generation de l'invoice en cours...", ephemeral=True
+            f"{EMOJI_LOADING} Géneration de l'invoice en cours...", ephemeral=True
         )
         try:
             callback_url = "https://api.veridiancloud.xyz/webhook/oxapay"
@@ -190,14 +195,16 @@ class PaymentsCog(commands.Cog):
                 return
 
             embed = discord.Embed(
-                title="Paiement Crypto",
-                color=discord.Color.gold(),
+                title=f"{EMOJI_TICKET} Paiement Crypto",
+                color=discord.Color(COLOR_WARNING),
                 description=(
                     f"Plan : **{plan.upper()}** | Montant : **{amount:.2f} EUR**\n\n"
                     "Cliquez sur le bouton ci-dessous pour effectuer votre paiement.\n"
                     "Le bot sera notifie automatiquement a la reception du paiement."
                 )
             )
+            embed.set_thumbnail(url=EMOJI_URL_LOADING)
+            embed.set_footer(text="Source: API")
             view = discord.ui.View()
             view.add_item(discord.ui.Button(label="Payer maintenant", url=invoice["payLink"]))
             await interaction.followup.send(embed=embed, view=view, ephemeral=True)
