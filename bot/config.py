@@ -6,6 +6,31 @@ Constantes globales du projet Veridian AI v0.2
 VERSION = "1.0.0"
 VERSION_EMOJI = "🤖"
 
+# --- Visual Identity (Veridian Green) ---
+# Discord Colors (int)
+COLOR_SUCCESS  = 0x2DFF8F  # Low importance / Success
+COLOR_NOTICE   = 0x00E676  # Medium importance / Info
+COLOR_WARNING  = 0x008037  # High importance / Admin
+COLOR_CRITICAL = 0x004D40  # Very high / Error / Security
+
+# Emojis (fallback texte) + assets pour embeds
+EMOJI_SUCCESS  = "✅"
+EMOJI_WARNING  = "⚠️"
+EMOJI_TICKET   = "🎫"
+EMOJI_AI_API   = "🤖"
+EMOJI_AI_CACHE = "💎"
+EMOJI_LOADING  = "⌛"
+EMOJI_ADMIN    = "🛡️"
+EMOJI_STAFF    = "⭐"
+EMOJI_AI       = EMOJI_AI_API  # Compat historique
+
+EMOJI_URL_WARNING  = "https://cdn3.emoji.gg/emojis/94735-warning.gif"
+EMOJI_URL_TICKET   = "https://cdn3.emoji.gg/emojis/437007-ticket.gif"
+EMOJI_URL_AI_API   = "https://cdn3.emoji.gg/emojis/77397-bot-mint-shiny.png"
+EMOJI_URL_AI_CACHE = "https://cdn3.emoji.gg/emojis/58354-bot-blue-shiny.png"
+EMOJI_URL_LOADING  = "https://cdn3.emoji.gg/emojis/2908-loading.gif"
+EMOJI_URL_ADMIN    = "https://cdn3.emoji.gg/emojis/731909-staffbadgegreen.png"
+
 # Discord Configuration
 BOT_OWNER_DISCORD_ID = 1047760053509312642
 ADMIN_IDS            = [1047760053509312642]
