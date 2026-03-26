@@ -20,8 +20,8 @@
   --red-dim:    rgba(255,77,109,0.10);
   --yellow:     #ffd166;
   --yellow-dim: rgba(255,209,102,0.10);
-  --blue:       #4da6ff;
-  --blue-dim:   rgba(77,166,255,0.10);
+  --blue:       #2dff8f;
+  --blue-dim:   rgba(45, 255, 143, 0.10);
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -469,7 +469,7 @@ section { position: relative; z-index: 1; }
 }
 .feature-icon.tone-blue {
   background: var(--blue-dim);
-  border-color: rgba(77,166,255,0.18);
+  border-color: rgba(45, 255, 143, 0.18);
   color: var(--blue);
 }
 .feature-icon.tone-yellow {

@@ -23,8 +23,8 @@
   --red-dim:      rgba(255,77,109,0.10);
   --yellow:       #ffc94d;
   --yellow-dim:   rgba(255,201,77,0.10);
-  --blue:         #4da6ff;
-  --blue-dim:     rgba(77,166,255,0.10);
+  --blue:         #2dff8f;
+  --blue-dim:     rgba(45, 255, 143, 0.10);
   --sidebar-w:    220px;
   --topbar-h:     52px;
 }
@@ -493,7 +493,7 @@ body::before {
 .stat-icon.c-green { background: var(--accent-dim); color: var(--accent); border-color: rgba(45,255,143,0.14); }
 .stat-icon.c-red   { background: var(--red-dim); color: var(--red); border-color: rgba(255,77,109,0.14); }
 .stat-icon.c-yellow{ background: var(--yellow-dim); color: var(--yellow); border-color: rgba(255,201,77,0.14); }
-.stat-icon.c-blue  { background: var(--blue-dim); color: var(--blue); border-color: rgba(77,166,255,0.14); }
+.stat-icon.c-blue  { background: var(--blue-dim); color: var(--blue); border-color: rgba(45, 255, 143, 0.14); }
 
 .stat-value {
   font-family: 'Space Mono', monospace;
