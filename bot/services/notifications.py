@@ -7,6 +7,9 @@ import discord
 from loguru import logger
 from typing import Optional
 from bot.config import BOT_OWNER_DISCORD_ID, DASHBOARD_URL
+from bot.config import COLOR_SUCCESS, COLOR_NOTICE, COLOR_WARNING, COLOR_CRITICAL
+from bot.config import EMOJI_ADMIN, EMOJI_TICKET, EMOJI_WARNING
+from bot.config import EMOJI_URL_ADMIN, EMOJI_URL_TICKET, EMOJI_URL_WARNING
 from bot.db.models import OrderModel, SubscriptionModel, PaymentModel, AuditLogModel
 
 
@@ -36,9 +39,10 @@ class NotificationService:
             username = user.name if user else f"User {user_id}"
 
             embed = discord.Embed(
-                title="Nouvelle commande PayPal",
-                color=discord.Color.gold()
+                title=f"{EMOJI_TICKET} Nouvelle commande PayPal",
+                color=discord.Color(COLOR_WARNING)
             )
+            embed.set_thumbnail(url=EMOJI_URL_TICKET)
             embed.add_field(name="Order ID",    value=f"`{order_id}`",           inline=False)
             embed.add_field(name="Utilisateur", value=f"{username} ({user_id})", inline=True)
             embed.add_field(name="Serveur",     value=guild.name if guild else str(guild_id), inline=True)
@@ -73,9 +77,10 @@ class NotificationService:
             username = user.name if user else f"User {user_id}"
 
             embed = discord.Embed(
-                title="Nouvelle commande Carte Cadeau",
-                color=discord.Color.brand_green()
+                title=f"{EMOJI_TICKET} Nouvelle commande Carte Cadeau",
+                color=discord.Color(COLOR_WARNING)
             )
+            embed.set_thumbnail(url=EMOJI_URL_TICKET)
             embed.add_field(name="Order ID",    value=f"`{order_id}`",           inline=False)
             embed.add_field(name="Utilisateur", value=f"{username} ({user_id})", inline=True)
             embed.add_field(name="Serveur",     value=guild.name if guild else str(guild_id), inline=True)
@@ -103,13 +108,14 @@ class NotificationService:
             user  = await self.bot.fetch_user(user_id)
             guild = self.bot.get_guild(guild_id)
             embed = discord.Embed(
-                title="Paiement confirme",
-                color=discord.Color.green(),
+                title=f"{EMOJI_ADMIN} Paiement confirme",
+                color=discord.Color(COLOR_SUCCESS),
                 description=(
                     f"Votre abonnement **{plan.upper()}** est actif"
                     f" sur **{guild.name if guild else guild_id}**. Merci !"
                 )
             )
+            embed.set_thumbnail(url=EMOJI_URL_ADMIN)
             await user.send(embed=embed)
             logger.info(f"Confirmation paiement envoyee a {user_id}")
         except Exception as e:
@@ -120,14 +126,15 @@ class NotificationService:
         try:
             user  = await self.bot.fetch_user(user_id)
             embed = discord.Embed(
-                title="Commande rejetee",
-                color=discord.Color.red(),
+                title=f"{EMOJI_WARNING} Commande rejetee",
+                color=discord.Color(COLOR_CRITICAL),
                 description=(
                     f"Votre commande `{order_id}` a ete rejetee."
                     + (f"\nRaison : {reason}" if reason else "")
                     + f"\nContactez le support : {DASHBOARD_URL}"
                 )
             )
+            embed.set_thumbnail(url=EMOJI_URL_WARNING)
             await user.send(embed=embed)
         except Exception as e:
             logger.error(f"Erreur notification rejet: {e}")
@@ -136,13 +143,14 @@ class NotificationService:
         try:
             user  = await self.bot.fetch_user(user_id)
             embed = discord.Embed(
-                title="Montant incomplet",
-                color=discord.Color.orange(),
+                title=f"{EMOJI_WARNING} Montant incomplet",
+                color=discord.Color(COLOR_NOTICE),
                 description=(
                     f"Le montant recu pour la commande `{order_id}` est insuffisant.\n"
                     "Veuillez envoyer le solde manquant avec la meme reference."
                 )
             )
+            embed.set_thumbnail(url=EMOJI_URL_WARNING)
             await user.send(embed=embed)
         except Exception as e:
             logger.error(f"Erreur notification paiement partiel: {e}")
