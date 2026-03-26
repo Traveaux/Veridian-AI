@@ -10,6 +10,9 @@ from bot.db.models import GuildModel, SubscriptionModel
 from bot.services.groq_client import GroqClient
 from bot.services.translator import TranslatorService
 from bot.config import MIN_MESSAGE_LENGTH, PLAN_LIMITS, DASHBOARD_URL
+from bot.config import COLOR_SUCCESS, COLOR_NOTICE, COLOR_WARNING, COLOR_CRITICAL
+from bot.config import EMOJI_SUCCESS, EMOJI_AI_API, EMOJI_WARNING
+from bot.config import EMOJI_URL_ADMIN, EMOJI_URL_AI_API, EMOJI_URL_WARNING
 
 
 class SupportCog(commands.Cog):
@@ -83,9 +86,9 @@ class SupportCog(commands.Cog):
                         if log_channel_id:
                             log_channel = message.guild.get_channel(int(log_channel_id))
                             if log_channel:
-                                color = discord.Color.red() if security_status == "malicious" else discord.Color.orange()
+                                color = discord.Color(COLOR_CRITICAL) if security_status == "malicious" else discord.Color(COLOR_WARNING)
                                 alert_embed = discord.Embed(
-                                    title="🛡️ Alerte Sécurité IA",
+                                    title=f"{EMOJI_WARNING} Alerte Sécurité IA",
                                     description=(
                                         f"Un message potentiellement **{security_status}** a été détecté.\n\n"
                                         f"**Utilisateur:** {message.author.mention} (`{message.author.id}`)\n"
@@ -94,6 +97,8 @@ class SupportCog(commands.Cog):
                                     ),
                                     color=color
                                 )
+                                alert_embed.set_thumbnail(url=EMOJI_URL_WARNING)
+                                alert_embed.set_footer(text="Source: backend")
                                 await log_channel.send(embed=alert_embed)
                                 logger.warning(f"Alerte secu IA ({security_status}) pour {message.author.id}")
                 except Exception as e:
@@ -117,13 +122,15 @@ class SupportCog(commands.Cog):
     async def premium_info(self, interaction: discord.Interaction):
         await interaction.response.defer(ephemeral=True)
         embed = discord.Embed(
-            title="Plans Veridian AI",
-            color=discord.Color.gold(),
+            title=f"{EMOJI_AI_API} Plans Veridian AI",
+            color=discord.Color(COLOR_WARNING),
             description=(
                 "Upgrade via le panel ou avec la commande `/pay`.\n"
                 f"{DASHBOARD_URL}"
             )
         )
+        embed.set_thumbnail(url=EMOJI_URL_AI_API)
+        embed.set_footer(text="Source: API")
         embed.add_field(
             name="Free",
             value="50 tickets/mois | 5 langues | Support public limite",
@@ -154,17 +161,19 @@ class SupportCog(commands.Cog):
                 embed = discord.Embed(
                     title="Abonnement",
                     description="Ce serveur est en plan **Free**.",
-                    color=discord.Color.greyple()
+                    color=discord.Color(COLOR_NOTICE)
                 )
+                embed.set_thumbnail(url=EMOJI_URL_ADMIN)
             else:
                 plan    = sub["plan"].upper()
                 expires = sub.get("expires_at", "Indefini")
                 embed   = discord.Embed(
-                    title="Abonnement",
+                    title=f"{EMOJI_SUCCESS} Abonnement",
                     description=f"Ce serveur est en plan **{plan}**.",
-                    color=discord.Color.green()
+                    color=discord.Color(COLOR_SUCCESS)
                 )
                 embed.add_field(name="Expire le", value=str(expires))
+                embed.set_thumbnail(url=EMOJI_URL_ADMIN)
             embed.set_footer(text=f"Utilisez /pay ou visitez {DASHBOARD_URL}")
             await interaction.followup.send(embed=embed, ephemeral=True)
         except Exception as e:
