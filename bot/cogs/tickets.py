@@ -956,14 +956,11 @@ class TicketsCog(commands.Cog):
 
                     embed = discord.Embed(
                         title="Traduction automatique dans la langue de l'utilisateur",
-                        description=(
-                            f"staff : {EMOJI_AI_CACHE if from_cache else EMOJI_AI_API} Traduction · "
-                            f"{get_lang_name(user_lang)} → {get_lang_name(staff_lang)} · "
-                            f"{'backend (cache)' if from_cache else 'api'}\n\n"
-                            f"{translated_text[:3900]}"
-                        ),
+                        description=translated_text[:3900],
                         color=discord.Color(COLOR_NOTICE if from_cache else COLOR_SUCCESS),
+                        timestamp=message.created_at
                     )
+                    embed.set_footer(text=message.author.display_name, icon_url=message.author.display_avatar.url)
                     await message.channel.send(embed=embed, reference=message, mention_author=False)
                     logger.debug(f"Traduction user->staff envoyee pour ticket {ticket['id']}")
                 except Exception as e:
