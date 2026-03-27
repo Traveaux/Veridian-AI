@@ -16,7 +16,7 @@ from bot.services.notifications import NotificationService
 from bot.services.oxapay import OxaPayClient
 from bot.config import BOT_OWNER_DISCORD_ID, PRICING, DASHBOARD_URL
 from bot.config import COLOR_SUCCESS, COLOR_NOTICE, COLOR_WARNING, COLOR_CRITICAL
-from bot.config import EMOJI_URL_TICKET
+from bot.config import EMOJI_ANIM_TICKET
 
 
 class PaymentsCog(commands.Cog):
@@ -108,14 +108,14 @@ class PaymentsCog(commands.Cog):
             title="Paiement PayPal",
             color=discord.Color(COLOR_NOTICE),
             description=(
-                f"[ticket.gif]({EMOJI_URL_TICKET})\n\n"
-                f"Plan : **{plan.upper()}** | Montant : **{amount:.2f} EUR**\n\n"
+                f"{EMOJI_ANIM_TICKET} Plan : **{plan.upper()}** | Montant : **{amount:.2f} EUR**\n\n"
                 f"Envoyez **{amount:.2f} EUR** a : `{paypal_email}`\n"
                 f"Indiquez comme reference : **{order_id}**\n\n"
                 "Votre commande sera validee sous 24h via le panel d'administration.\n"
                 f"Suivi : {DASHBOARD_URL}"
             )
         )
+        embed.set_thumbnail(url=EMOJI_URL_TICKET)
         embed.set_footer(text="Sans la reference de commande, le paiement ne sera pas reconnu.")
 
         await interaction.followup.send(embed=embed, ephemeral=True)
@@ -134,11 +134,11 @@ class PaymentsCog(commands.Cog):
             title="Carte Cadeau",
             color=discord.Color(COLOR_SUCCESS),
             description=(
-                f"[ticket.gif]({EMOJI_URL_TICKET})\n\n"
-                f"Plan : **{plan.upper()}** | Montant : **{amount:.2f} EUR**\n\n"
+                f"{EMOJI_ANIM_TICKET} Plan : **{plan.upper()}** | Montant : **{amount:.2f} EUR**\n\n"
                 "Vous allez recevoir un DM pour envoyer votre code et l'image de la carte."
             )
         )
+        embed.set_thumbnail(url=EMOJI_URL_TICKET)
         await interaction.followup.send(embed=embed, ephemeral=True)
 
         def check(msg: discord.Message):
@@ -197,12 +197,12 @@ class PaymentsCog(commands.Cog):
                 title="Paiement Crypto",
                 color=discord.Color(COLOR_WARNING),
                 description=(
-                    f"[ticket.gif]({EMOJI_URL_TICKET})\n\n"
-                    f"Plan : **{plan.upper()}** | Montant : **{amount:.2f} EUR**\n\n"
+                    f"{EMOJI_ANIM_TICKET} Plan : **{plan.upper()}** | Montant : **{amount:.2f} EUR**\n\n"
                     "Cliquez sur le bouton ci-dessous pour effectuer votre paiement.\n"
                     "Le bot sera notifie automatiquement a la reception du paiement."
                 )
             )
+            embed.set_thumbnail(url=EMOJI_URL_TICKET)
             view = discord.ui.View()
             view.add_item(discord.ui.Button(label="Payer maintenant", url=invoice["payLink"]))
             await interaction.followup.send(embed=embed, view=view, ephemeral=True)

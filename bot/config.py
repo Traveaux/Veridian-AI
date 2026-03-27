@@ -24,6 +24,9 @@ EMOJI_ADMIN    = "🛡️"
 EMOJI_STAFF    = "⭐"
 EMOJI_AI       = EMOJI_AI_API  # Compat historique
 
+# Syntax pour emojis animés (Remplacez l'ID par le vôtre après l'avoir récupéré via \:emoji:)
+EMOJI_ANIM_TICKET = "<a:ticket:1342939103901749320>"
+
 EMOJI_URL_WARNING  = "https://cdn3.emoji.gg/emojis/94735-warning.gif"
 EMOJI_URL_TICKET   = "https://cdn3.emoji.gg/emojis/437007-ticket.gif"
 EMOJI_URL_AI_API   = "https://cdn3.emoji.gg/emojis/77397-bot-mint-shiny.png"

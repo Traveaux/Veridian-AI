@@ -18,7 +18,7 @@ from bot.services.translator import TranslatorService
 from bot.services.groq_client import GroqClient
 from bot.config import TICKET_CHANNEL_PREFIX, BOT_OWNER_DISCORD_ID
 from bot.config import COLOR_SUCCESS, COLOR_NOTICE, COLOR_WARNING, COLOR_CRITICAL
-from bot.config import EMOJI_AI_API, EMOJI_AI_CACHE, EMOJI_URL_TICKET
+from bot.config import EMOJI_AI_API, EMOJI_AI_CACHE, EMOJI_ANIM_TICKET
 
 LANGUAGE_NAMES = {
     "fr": "Français", "en": "Anglais", "es": "Espagnol", 
@@ -638,8 +638,7 @@ class TicketsCog(commands.Cog):
             title="Ticket de Support",
             color=_embed_color(cfg.get("ticket_welcome_color")),
             description=(
-                f"[ticket.gif]({EMOJI_URL_TICKET})\n\n"
-                "Le ticket est prêt. Utilisez les boutons ci-dessous pour l’assignation, la transcription et la clôture."
+                f"{EMOJI_ANIM_TICKET} Le ticket est prêt. Utilisez les boutons ci-dessous pour l’assignation."
             ),
         )
         embed.add_field(name="Message utilisateur", value=_truncate_block(_render_template(user_template, variables)), inline=False)
