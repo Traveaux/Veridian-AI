@@ -907,7 +907,7 @@ class TicketsCog(commands.Cog):
         auto_translate = bool(guild_config.get("auto_translate", 1))
 
         is_ticket_user = message.author.id == ticket["user_id"]
-        detected_lang = self.translator.detect_language(text) if text else None
+        detected_lang = await asyncio.to_thread(self.translator.detect_language, text) if text else None
 
         translated_text = None
         from_cache = False
@@ -1081,6 +1081,11 @@ class TicketsCog(commands.Cog):
 
         # User language might still be pending if the user hasn't typed yet.
         user_lang = ticket.get("user_language") if ticket.get("user_language") not in (None, "", "auto") else None
+        if not user_lang:
+            user_lang = self._dominant_language_from_history(ticket["id"], ticket.get("user_id"))
+            if user_lang:
+                TicketModel.update(ticket["id"], user_language=user_lang)
+                ticket["user_language"] = user_lang
         if not user_lang:
             user_db = UserModel.get(ticket["user_id"])
             if user_db and user_db.get("preferred_language") not in (None, "", "auto"):
@@ -1354,16 +1359,18 @@ class TicketsCog(commands.Cog):
 
     async def cog_app_command_error(self, interaction: discord.Interaction, error: discord.app_commands.AppCommandError):
         if isinstance(error, discord.app_commands.CommandOnCooldown):
+            embed = discord.Embed(
+                title="Veuillez patienter",
+                description=(
+                    f"Vous pouvez ouvrir un nouveau ticket dans **{int(error.retry_after)} secondes**.\n"
+                    "Cette limite existe pour éviter les abus."
+                ),
+                color=discord.Color(COLOR_WARNING),
+            )
             if not interaction.response.is_done():
-                await interaction.response.send_message(
-                    f"Veuillez patienter {int(error.retry_after)}s avant de réutiliser cette commande.",
-                    ephemeral=True
-                )
+                await interaction.response.send_message(embed=style_embed(embed), ephemeral=True)
             else:
-                await interaction.followup.send(
-                    f"Veuillez patienter {int(error.retry_after)}s avant de réutiliser cette commande.",
-                    ephemeral=True
-                )
+                await interaction.followup.send(embed=style_embed(embed), ephemeral=True)
         else:
             logger.error(f"Erreur TicketCog command: {error}")
 

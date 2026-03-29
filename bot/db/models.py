@@ -127,6 +127,7 @@ class UserModel:
                     VALUES (%s, %s, %s, NOW())
                     ON DUPLICATE KEY UPDATE
                         username = VALUES(username),
+                        preferred_language = VALUES(preferred_language),
                         last_seen_at = NOW()
                 """
                 cursor.execute(query, (user_id, username, preferred_language))
@@ -290,6 +291,19 @@ class TicketModel:
                 (guild_id,),
             )
             return cursor.fetchone()[0]
+
+    @staticmethod
+    def get_active_by_user(guild_id: int, user_id: int) -> Optional[Dict]:
+        with get_db_context() as conn:
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute(
+                f"SELECT * FROM {DB_TABLE_PREFIX}tickets "
+                f"WHERE guild_id = %s AND user_id = %s "
+                f"AND status IN ('open','in_progress','pending_close') "
+                f"ORDER BY opened_at DESC LIMIT 1",
+                (guild_id, user_id),
+            )
+            return cursor.fetchone()
 
     @staticmethod
     def count_today() -> int:

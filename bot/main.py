@@ -490,11 +490,24 @@ async def on_guild_join(guild: discord.Guild):
                 owner = None
 
         if owner:
-            await owner.send(
-                f"Merci d'avoir ajouté **Veridian AI** sur **{guild.name}**.\n"
-                f"Configure le bot via le dashboard : {DASHBOARD_URL}\n"
-                "Sélectionne ton serveur puis configure Tickets / Support / Langue."
+            from bot.utils.embed_style import style_embed
+            from bot.config import COLOR_SUCCESS
+
+            embed = discord.Embed(
+                title=f"Merci d'avoir installé Veridian AI sur {guild.name}",
+                description=(
+                    "**3 étapes pour démarrer :**\n\n"
+                    f"**1.** Configurer le bot via le dashboard\n→ {DASHBOARD_URL}\n\n"
+                    "**2.** Définir la catégorie des tickets et le rôle staff\n\n"
+                    "**3.** Lancer `/ticket` pour tester\n\n"
+                    "En cas de problème, utilisez le dashboard ou le support."
+                ),
+                color=discord.Color(COLOR_SUCCESS),
             )
+            if bot.user:
+                embed.set_thumbnail(url=bot.user.display_avatar.url)
+            embed.set_footer(text=f"Veridian AI v{VERSION}")
+            await owner.send(embed=style_embed(embed))
     except Exception as e:
         logger.debug(f"DM owner failed for guild {guild.id}: {e}")
     

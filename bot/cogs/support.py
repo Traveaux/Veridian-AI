@@ -6,12 +6,25 @@ Les commandes de configuration sont gerees via le dashboard.
 import discord
 from discord.ext import commands
 from loguru import logger
-from bot.db.models import GuildModel, SubscriptionModel
+from bot.db.models import GuildModel, SubscriptionModel, TicketModel, UserModel
 from bot.services.groq_client import GroqClient
 from bot.services.translator import TranslatorService
 from bot.config import MIN_MESSAGE_LENGTH, PLAN_LIMITS, DASHBOARD_URL
 from bot.config import COLOR_SUCCESS, COLOR_NOTICE, COLOR_WARNING, COLOR_CRITICAL
 from bot.utils.embed_style import style_embed
+
+LANGUAGE_NAMES = {
+    "fr": "Français",
+    "en": "Anglais",
+    "es": "Espagnol",
+    "de": "Allemand",
+    "it": "Italien",
+    "pt": "Portugais",
+    "ru": "Russe",
+    "ja": "Japonais",
+    "zh": "Chinois",
+    "ar": "Arabe",
+}
 
 
 class SupportCog(commands.Cog):
@@ -172,6 +185,60 @@ class SupportCog(commands.Cog):
         except Exception as e:
             logger.error(f"Erreur subscription_status: {e}")
             await interaction.followup.send(f"Erreur : {e}", ephemeral=True)
+
+    @discord.app_commands.command(name="language", description="Définir votre langue préférée")
+    @discord.app_commands.describe(code="Code langue : fr, en, es, de, it, pt, ru, ja, zh, ar…")
+    async def set_language(self, interaction: discord.Interaction, code: str):
+        await interaction.response.defer(ephemeral=True)
+        code = (code or "").strip().lower()[:2]
+        if len(code) != 2 or not code.isalpha():
+            await interaction.followup.send("Code langue invalide. Exemple: `fr`, `en`, `es`.", ephemeral=True)
+            return
+
+        UserModel.upsert(interaction.user.id, interaction.user.name, code)
+
+        try:
+            ticket = TicketModel.get_active_by_user(interaction.guild.id, interaction.user.id)
+            if ticket:
+                TicketModel.update(ticket["id"], user_language=code)
+                chan = interaction.guild.get_channel(int(ticket["channel_id"]))
+                if chan:
+                    tickets_cog = self.bot.get_cog("TicketsCog")
+                    if tickets_cog:
+                        await tickets_cog._try_update_welcome_embed(chan, ticket["id"])
+        except Exception:
+            pass
+
+        lang_name = LANGUAGE_NAMES.get(code, code.upper())
+        embed = discord.Embed(
+            title="Langue mise à jour",
+            description=f"Votre langue est maintenant : **{lang_name}** (`{code}`)",
+            color=discord.Color(COLOR_SUCCESS)
+        )
+        await interaction.followup.send(embed=style_embed(embed), ephemeral=True)
+
+    @discord.app_commands.command(name="stats", description="Voir les statistiques du serveur")
+    @discord.app_commands.checks.has_permissions(administrator=True)
+    async def server_stats(self, interaction: discord.Interaction):
+        await interaction.response.defer(ephemeral=True)
+        try:
+            open_t = TicketModel.count_by_guild(interaction.guild.id, status="open")
+            month_t = TicketModel.count_this_month(interaction.guild.id)
+            sub = SubscriptionModel.get(interaction.guild.id)
+            plan = (sub or {}).get("plan", "free").upper()
+
+            embed = discord.Embed(
+                title=f"Statistiques — {interaction.guild.name}",
+                color=discord.Color(COLOR_SUCCESS)
+            )
+            embed.add_field(name="Tickets ouverts", value=f"`{open_t}`", inline=True)
+            embed.add_field(name="Tickets ce mois", value=f"`{month_t}`", inline=True)
+            embed.add_field(name="Plan actuel", value=f"`{plan}`", inline=True)
+            embed.set_footer(text=f"Voir plus sur {DASHBOARD_URL}")
+            await interaction.followup.send(embed=style_embed(embed), ephemeral=True)
+        except Exception as e:
+            logger.error(f"stats error: {e}")
+            await interaction.followup.send("Erreur lors de la récupération des stats.", ephemeral=True)
 
 
 async def setup(bot):
