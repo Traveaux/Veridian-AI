@@ -59,7 +59,7 @@ class OxaPayClient:
             logger.error(f"✗ Erreur lors de la création d'invoice OxaPay: {e}")
             return {}
 
-    def verify_webhook_signature(self, payload: dict, signature: str) -> bool:
+    def verify_webhook_signature(self, payload: bytes | dict, signature: str) -> bool:
         """
         Vérifie la signature HMAC d'un webhook OxaPay.
         
@@ -81,18 +81,21 @@ class OxaPayClient:
             if not signature:
                 return False
 
-            # Convertir payload en JSON pour le calcul du hash
-            payload_json = json.dumps(payload, sort_keys=True)
+            if isinstance(payload, bytes):
+                payload_bytes = payload
+            else:
+                payload_json = json.dumps(payload, sort_keys=True, separators=(",", ":"))
+                payload_bytes = payload_json.encode()
             
             # Calculer le HMAC-SHA256
             expected_signature = hmac.new(
                 self.webhook_secret.encode(),
-                payload_json.encode(),
+                payload_bytes,
                 hashlib.sha256
             ).hexdigest()
             
             # Comparaison sécurisée
-            if hmac.compare_digest(expected_signature, signature):
+            if hmac.compare_digest(expected_signature, signature.lower()):
                 logger.info("✓ Signature webhook OxaPay valide")
                 return True
             else:

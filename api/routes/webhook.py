@@ -22,11 +22,11 @@ def verify_oxapay_signature(payload: bytes, signature: str) -> bool:
     if not secret or not signature:
         return False
     expected_signature = hmac.new(
-        secret.encode(), 
+        secret.encode("utf-8"),
         payload, 
         hashlib.sha256
     ).hexdigest()
-    return hmac.compare_digest(expected_signature, signature)
+    return hmac.compare_digest(expected_signature, signature.lower())
 
 
 @router.post("/oxapay")
@@ -50,18 +50,22 @@ async def oxapay_webhook(request: Request):
     try:
         # Récupérer et vérifier la signature
         body = await request.body()
-        signature = request.headers.get("X-Oxapay-Signature")
+        signature = request.headers.get("X-Oxapay-Signature", "")
         
         if not signature or not verify_oxapay_signature(body, signature):
             raise HTTPException(status_code=401, detail="Invalid signature")
         
-        payload = json.loads(body)
+        try:
+            payload = json.loads(body)
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail="Invalid JSON")
         
         # Vérifier le statut du paiement
-        if payload.get("status") != "completed":
+        status = str(payload.get("status") or "").lower()
+        if status not in ("paid", "completed"):
             return JSONResponse(
                 status_code=200,
-                content={"status": "ignored", "reason": "payment not completed"}
+                content={"status": "ignored", "reason": f"status={status}"}
             )
         
         order_id = payload.get("order_id")
@@ -73,7 +77,7 @@ async def oxapay_webhook(request: Request):
         if order and str(order.get("status") or "").lower() == "paid":
             return JSONResponse(
                 status_code=200,
-                content={"status": "ignored", "reason": "order already processed"}
+                content={"status": "already_processed"}
             )
 
         user_id = payload.get("user_id") or (order or {}).get("user_id")
@@ -127,22 +131,23 @@ async def oxapay_webhook(request: Request):
             raise HTTPException(status_code=500, detail="Internal processing error")
         
         # 4. Notifier le Bot Owner
-        await notify_bot_owner_payment(
-            user_id=user_id,
-            guild_id=guild_id,
-            plan=plan,
-            method="oxapay",
-            amount=amount,
-            order_id=order_id
-        )
+        try:
+            await notify_bot_owner_payment(
+                user_id=user_id,
+                guild_id=guild_id,
+                plan=plan,
+                method="oxapay",
+                amount=amount,
+                order_id=order_id
+            )
+        except Exception as notify_error:
+            logger.warning(f"OxaPay owner notification failed: {notify_error}")
         
         return JSONResponse(
             status_code=200,
             content={"status": "success", "message": "Subscription activated"}
         )
     
-    except json.JSONDecodeError:
-        raise HTTPException(status_code=400, detail="Invalid JSON")
     except HTTPException:
         raise
     except Exception as e:
