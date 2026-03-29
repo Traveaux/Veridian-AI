@@ -267,6 +267,20 @@ def _ensure_ticket_migrations() -> None:
                     if "duplicate column" not in str(e).lower():
                         logger.warning(f"[db] ALTER {tickets_table}.assigned_staff_name: {e}")
 
+        if _column_info(tickets_table, "ai_intent") is None:
+            with get_db_context() as conn:
+                cursor = conn.cursor()
+                try:
+                    cursor.execute(
+                        f"ALTER TABLE {tickets_table} "
+                        f"ADD COLUMN ai_intent TEXT NULL "
+                        f"COMMENT 'Analyse IA du premier message'"
+                    )
+                    logger.info(f"[db] Colonne ai_intent ajoutee a {tickets_table}")
+                except Exception as e:
+                    if "duplicate column" not in str(e).lower():
+                        logger.warning(f"[db] ALTER {tickets_table}.ai_intent: {e}")
+
         if _column_info(tickets_table, "assigned_staff_id") is None:
             with get_db_context() as conn:
                 cursor = conn.cursor()

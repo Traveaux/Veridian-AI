@@ -90,6 +90,7 @@ CREATE TABLE IF NOT EXISTS vai_tickets (
     staff_language      VARCHAR(10)     DEFAULT 'en',
     assigned_staff_id   BIGINT,
     assigned_staff_name VARCHAR(100),
+    ai_intent           TEXT                        COMMENT 'Analyse IA du premier message (Smart Welcome)',
     priority            ENUM('low','medium','high','urgent') DEFAULT 'medium',
     close_reason        TEXT,
     transcript          LONGTEXT                    COMMENT 'Resume IA genere a la cloture',
