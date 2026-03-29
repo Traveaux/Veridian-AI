@@ -1328,18 +1328,28 @@ class PendingNotificationModel:
 
     @staticmethod
     def list_pending(limit: int = 20) -> List[Dict]:
-        """Récupére les notifications à envoyer (max 5 tentatives)."""
+        """Récupére les notifications à envoyer avec backoff exponentiel."""
         with get_db_context() as conn:
             cursor = conn.cursor(dictionary=True)
             try:
                 cursor.execute(
                     f"SELECT * FROM {DB_TABLE_PREFIX}pending_notifications "
-                    f"WHERE attempts < 5 ORDER BY created_at ASC LIMIT %s",
+                    f"WHERE attempts < 5 "
+                    f"AND (last_attempt IS NULL OR last_attempt < DATE_SUB(NOW(), INTERVAL POWER(2, attempts) MINUTE)) "
+                    f"ORDER BY created_at ASC LIMIT %s",
                     (limit,)
                 )
                 return cursor.fetchall()
             except Exception:
-                return []
+                try:
+                    cursor.execute(
+                        f"SELECT * FROM {DB_TABLE_PREFIX}pending_notifications "
+                        f"WHERE attempts < 5 ORDER BY created_at ASC LIMIT %s",
+                        (limit,)
+                    )
+                    return cursor.fetchall()
+                except Exception:
+                    return []
 
     @staticmethod
     def delete(notif_id: int) -> bool:
