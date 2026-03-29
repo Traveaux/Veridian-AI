@@ -854,6 +854,12 @@ footer {
 .reveal-delay-4 { transition-delay: 0.4s; }
 .reveal-delay-5 { transition-delay: 0.5s; }
 
+.social-proof-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+
 /* ── SCROLLBAR ── */
 ::-webkit-scrollbar { width: 6px; }
 ::-webkit-scrollbar-track { background: var(--bg2); }
@@ -865,6 +871,7 @@ footer {
   .navbar { padding: 0 20px; }
   .nav-links { display: none; }
   .features-grid, .pricing-grid { grid-template-columns: 1fr; }
+  .social-proof-grid { grid-template-columns: 1fr; }
   .how-steps { grid-template-columns: repeat(2, 1fr); }
   .how-steps::before { display: none; }
   .hero-stats { gap: 24px; }
