@@ -8,6 +8,7 @@ import os
 from groq import Groq
 from loguru import logger
 from bot.config import GROQ_MODEL_FAST, GROQ_MODEL_QUALITY, SYSTEM_PROMPT_SUPPORT, SYSTEM_PROMPT_TICKET_SUMMARY
+from bot.utils.embed_style import strip_emojis
 
 
 class GroqClient:
@@ -94,7 +95,7 @@ class GroqClient:
                 
                 response = completion.choices[0].message.content
                 logger.info(f"✓ Support généré (clé #{attempt + 1}, {len(response)} chars)")
-                return response
+                return strip_emojis(response) or ""
                 
             except Exception as e:
                 logger.warning(f"⚠ Clé Groq #{attempt + 1} échouée: {str(e)[:100]}")
@@ -112,7 +113,8 @@ class GroqClient:
             "Rules:\n"
             "- Translate strictly from the source language to the target language.\n"
             "- Output ONLY the translated text (no quotes, no explanations).\n"
-            "- Preserve formatting, line breaks, emojis, mentions and code blocks.\n"
+            "- Preserve formatting, line breaks, mentions and code blocks.\n"
+            "- Do not add emojis.\n"
             "- Do not add or remove information.\n"
         )
         prompt = (
@@ -140,7 +142,7 @@ class GroqClient:
                 )
                 
                 logger.debug(f"✓ Traduction (clé #{attempt + 1})")
-                return completion.choices[0].message.content.strip()
+                return strip_emojis(completion.choices[0].message.content.strip()) or ""
                 
             except Exception as e:
                 logger.warning(f"⚠ Clé Groq #{attempt + 1} traduction: {str(e)[:80]}")
@@ -177,12 +179,12 @@ class GroqClient:
                 )
                 
                 logger.info(f"✓ Résumé (clé #{attempt + 1})")
-                return completion.choices[0].message.content
+                return strip_emojis(completion.choices[0].message.content) or ""
                 
             except Exception as e:
                 logger.warning(f"⚠ Clé Groq #{attempt + 1} résumé: {str(e)[:80]}")
         
-        return "Impossible de générer le résumé du ticket."
+        return "Impossible de generer le resume du ticket."
 
     def classify_ticket_priority(self, messages: list, ticket_language: str) -> str:
         """
