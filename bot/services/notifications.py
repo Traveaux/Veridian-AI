@@ -8,8 +8,8 @@ from loguru import logger
 from typing import Optional
 from bot.config import BOT_OWNER_DISCORD_ID, DASHBOARD_URL
 from bot.config import COLOR_SUCCESS, COLOR_NOTICE, COLOR_WARNING, COLOR_CRITICAL
-from bot.config import EMOJI_URL_TICKET
 from bot.db.models import OrderModel, SubscriptionModel, PaymentModel, AuditLogModel
+from bot.utils.embed_style import style_embed
 
 
 class NotificationService:
@@ -41,7 +41,6 @@ class NotificationService:
                 title="Nouvelle commande PayPal",
                 color=discord.Color(COLOR_WARNING)
             )
-            embed.description = f"[ticket.gif]({EMOJI_URL_TICKET})"
             embed.add_field(name="Order ID",    value=f"`{order_id}`",           inline=False)
             embed.add_field(name="Utilisateur", value=f"{username} ({user_id})", inline=True)
             embed.add_field(name="Serveur",     value=guild.name if guild else str(guild_id), inline=True)
@@ -55,7 +54,7 @@ class NotificationService:
             embed.timestamp = discord.utils.utcnow()
 
             view = PaymentButtonView(order_id, self.bot)
-            await owner.send(embed=embed, view=view)
+            await owner.send(embed=style_embed(embed), view=view)
             logger.info(f"Notification PayPal envoyee pour {order_id}")
 
         except Exception as e:
@@ -79,7 +78,6 @@ class NotificationService:
                 title="Nouvelle commande Carte Cadeau",
                 color=discord.Color(COLOR_WARNING)
             )
-            embed.description = f"[ticket.gif]({EMOJI_URL_TICKET})"
             embed.add_field(name="Order ID",    value=f"`{order_id}`",           inline=False)
             embed.add_field(name="Utilisateur", value=f"{username} ({user_id})", inline=True)
             embed.add_field(name="Serveur",     value=guild.name if guild else str(guild_id), inline=True)
@@ -96,7 +94,7 @@ class NotificationService:
             embed.timestamp = discord.utils.utcnow()
 
             view = PaymentButtonView(order_id, self.bot)
-            await owner.send(embed=embed, view=view)
+            await owner.send(embed=style_embed(embed), view=view)
             logger.info(f"Notification carte cadeau envoyee pour {order_id}")
 
         except Exception as e:
@@ -114,7 +112,7 @@ class NotificationService:
                     f" sur **{guild.name if guild else guild_id}**. Merci !"
                 )
             )
-            await user.send(embed=embed)
+            await user.send(embed=style_embed(embed))
             logger.info(f"Confirmation paiement envoyee a {user_id}")
         except Exception as e:
             logger.error(f"Erreur notification confirmation: {e}")
@@ -132,7 +130,7 @@ class NotificationService:
                     + f"\nContactez le support : {DASHBOARD_URL}"
                 )
             )
-            await user.send(embed=embed)
+            await user.send(embed=style_embed(embed))
         except Exception as e:
             logger.error(f"Erreur notification rejet: {e}")
 
@@ -147,7 +145,7 @@ class NotificationService:
                     "Veuillez envoyer le solde manquant avec la meme reference."
                 )
             )
-            await user.send(embed=embed)
+            await user.send(embed=style_embed(embed))
         except Exception as e:
             logger.error(f"Erreur notification paiement partiel: {e}")
 
