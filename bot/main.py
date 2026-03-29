@@ -39,7 +39,7 @@ logger.add(
 logger.add(sys.stdout, format="{message}", level="INFO")
 
 # Import config après logs setup
-from bot.config import VERSION, VERSION_EMOJI
+from bot.config import VERSION
 from bot.config import DASHBOARD_URL
 
 # Heure de démarrage du bot (sera mise à jour dans on_ready)
@@ -114,7 +114,7 @@ async def on_ready():
     global _persistent_views_restored
     _bot_start_time = datetime.now(timezone.utc)
     
-    status_text = f"{VERSION_EMOJI} v{VERSION}"
+    status_text = f"v{VERSION}"
     await bot.change_presence(
         activity=discord.Activity(
             type=discord.ActivityType.streaming,
@@ -325,7 +325,7 @@ async def _deploy_ticket_open_messages():
                     guild_id=guild_id,
                     label=(cfg.get("ticket_button_label") or "Ouvrir un ticket"),
                     style=(cfg.get("ticket_button_style") or "primary"),
-                    emoji=(cfg.get("ticket_button_emoji") or None),
+                    emoji=None,
                 )
 
             # Send or edit existing
@@ -394,7 +394,7 @@ async def _restore_persistent_views():
                         guild_id=guild_id,
                         label=(cfg.get("ticket_button_label") or "Ouvrir un ticket"),
                         style=(cfg.get("ticket_button_style") or "primary"),
-                        emoji=(cfg.get("ticket_button_emoji") or None),
+                        emoji=None,
                     )
 
                 bot.add_view(view, message_id=int(message_id))
@@ -527,7 +527,7 @@ async def load_cogs():
 
 async def main():
     """Fonction principale."""
-    logger.info(f"🚀 Démarrage Veridian AI {VERSION}")
+    logger.info(f"Demarrage Veridian AI {VERSION}")
     
     # Initialiser la base de données
     if not initialize_database():
