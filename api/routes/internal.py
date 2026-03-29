@@ -713,6 +713,26 @@ def get_guild_stats(guild_id: int):
     }
 
 
+@router.get("/guild/{guild_id}/activity", dependencies=[Depends(verify_guild_access)])
+def get_guild_activity(guild_id: int, limit: int = 20):
+    """Activité récente simplifiée pour le widget dashboard."""
+    try:
+        tickets = TicketModel.get_by_guild(guild_id, page=1, limit=min(max(int(limit), 1), 20))
+        activity = []
+        for ticket in tickets[: min(max(int(limit), 1), 20)]:
+            activity.append({
+                "type": "ticket",
+                "id": ticket.get("id"),
+                "user": ticket.get("user_username") or str(ticket.get("user_id", "?")),
+                "status": ticket.get("status"),
+                "lang": ticket.get("user_language"),
+                "time": str(ticket.get("opened_at", "")),
+            })
+        return {"guild_id": guild_id, "activity": activity}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 def _generate_order_id() -> str:
     now = datetime.utcnow()
     return f"VAI-{now.year}{now.month:02d}-{random.randint(1000, 9999)}"

@@ -634,6 +634,8 @@ async function loadDashboardStats() {
     if (badge) badge.textContent = "—";
     setStatValue("stat-orders-attente", "—");
   }
+
+  loadRecentActivity();
 }
 
 function buildLast7DaysSeries(dailyCounts) {
@@ -668,6 +670,48 @@ function setStatValue(id, value) {
   if (el) {
     if (String(value).includes("<svg")) el.innerHTML = value;
     else el.textContent = value;
+  }
+}
+
+async function loadRecentActivity() {
+  if (!state.currentGuild) return;
+  const container = document.getElementById("activity-recent");
+  if (!container) return;
+
+  try {
+    const data = await apiFetch(`/internal/guild/${state.currentGuild.id}/activity`, { auth: true });
+    const activity = Array.isArray(data.activity) ? data.activity.slice(0, 8) : [];
+
+    if (!activity.length) {
+      container.innerHTML = `<div class="empty-state"><div class="empty-icon">🎫</div><div class="empty-text">Aucun ticket récent</div></div>`;
+      return;
+    }
+
+    const statusColors = {
+      open: "var(--accent)",
+      in_progress: "var(--yellow)",
+      pending_close: "var(--red)",
+      closed: "var(--text3)",
+    };
+
+    container.innerHTML = activity.map((item) => {
+      const color = statusColors[item.status] || "var(--text3)";
+      const ts = item.time ? timeAgo(item.time) : "—";
+      const lang = item.lang ? `<span class="lang-chip">${escHtml(String(item.lang).toUpperCase())}</span>` : "";
+      return `
+        <div class="activity-row">
+          <div class="activity-icon-wrap" style="background:${color}22;color:${color}">🎫</div>
+          <div class="activity-text">
+            <strong>${escHtml(item.user || "?")}</strong>
+            a ouvert le ticket <span class="mono">#${escHtml(item.id)}</span>
+            ${lang}
+          </div>
+          <div class="activity-time">${escHtml(ts)}</div>
+        </div>
+      `;
+    }).join("");
+  } catch (_) {
+    container.innerHTML = `<div style="color:var(--text3);text-align:center;padding:16px;font-size:12px">Impossible de charger l'activité</div>`;
   }
 }
 
