@@ -88,33 +88,44 @@ _JWT_SECRET = get_jwt_secret()
 # ============================================================================
 # Dict for storing ip -> [timestamps]
 _RATE_LIMIT_DATA: dict[str, list[float]] = {}
-_RATE_LIMIT_MAX = 60    # total requests
-_RATE_LIMIT_WINDOW = 60 # per 60 seconds
+_RATE_LIMIT_MAX = 60
+_RATE_LIMIT_WINDOW = 60
+_ROUTE_LIMITS = {
+    "/auth/exchange": (10, 60),
+    "/auth/discord/login": (20, 60),
+    "/internal/": (120, 60),
+    "/webhook/": (200, 60),
+}
 
 
 @app.middleware("http")
 async def _rate_limit_middleware(request: Request, call_next):
-    # Only rate limit sensitive endpoints (API /auth and /internal)
     path = request.url.path
-    if not (path.startswith("/auth/") or path.startswith("/internal/")):
+    if not (path.startswith("/auth/") or path.startswith("/internal/") or path.startswith("/webhook/")):
         return await call_next(request)
 
     client_ip = request.client.host if request.client else "unknown"
     now = time.time()
 
-    # Clean old timestamps
-    history = _RATE_LIMIT_DATA.get(client_ip, [])
-    history = [t for t in history if now - t < _RATE_LIMIT_WINDOW]
+    max_req, window = _RATE_LIMIT_MAX, _RATE_LIMIT_WINDOW
+    for prefix, config in _ROUTE_LIMITS.items():
+        if path.startswith(prefix):
+            max_req, window = config
+            break
 
-    if len(history) >= _RATE_LIMIT_MAX:
+    key = f"{client_ip}:{path[:20]}"
+    history = [t for t in _RATE_LIMIT_DATA.get(key, []) if now - t < window]
+
+    if len(history) >= max_req:
         logger.warning(f"Rate limit exceeded for {client_ip} on {path}")
         return JSONResponse(
             status_code=429,
-            content={"detail": "Too Many Requests. Please try again later."}
+            headers={"Retry-After": str(window)},
+            content={"detail": "Too Many Requests", "retry_after": window}
         )
 
     history.append(now)
-    _RATE_LIMIT_DATA[client_ip] = history
+    _RATE_LIMIT_DATA[key] = history
     return await call_next(request)
 
 
@@ -233,65 +244,138 @@ class SendDMRequest(BaseModel):
 
 @app.get("/health", tags=["Health"])
 async def health_check():
-    """Vérifie la santé de l'API."""
+    """Vérifie la santé de l'API et de la base."""
+    checks = {
+        "api": "ok",
+        "database": "unknown",
+        "version": VERSION,
+        "environment": ENVIRONMENT,
+        "api_domain": API_DOMAIN,
+        "timestamp": datetime.utcnow().isoformat() + "Z",
+    }
+    http_status = 200
+
     try:
         from bot.db.connection import get_connection
-        try:
-            conn = get_connection()
-            conn.close()
-            db_status = "healthy"
-        except Exception:
-            db_status = "unhealthy"
-
-        return {
-            "status": "online",
-            "version": VERSION,
-            "environment": ENVIRONMENT,
-            "database": db_status,
-            "timestamp": datetime.utcnow().isoformat(),
-            "api_domain": API_DOMAIN
-        }
+        conn = get_connection()
+        conn.close()
+        checks["database"] = "ok"
     except Exception as e:
-        logger.error(f"✗ Health check error: {e}")
-        detail = "Service degraded"
-        if not is_production():
-            detail = f"Debug: {str(e)}"
-        return JSONResponse(status_code=503, content={"status": "degraded", "detail": detail})
+        checks["database"] = "error"
+        checks["database_error"] = str(e)[:100]
+        http_status = 503
+
+    return JSONResponse(status_code=http_status, content=checks)
 
 
 @app.post("/webhook/oxapay", tags=["Webhooks"])
-async def oxapay_webhook(payload: dict, x_webhook_signature: str = Header(None)):
-    """Reçoit les webhooks OxaPay."""
+async def oxapay_webhook(request: Request):
+    """Reçoit les webhooks OxaPay et traite les paiements de façon idempotente."""
     try:
-        from bot.services.oxapay import OxaPayClient
-        from bot.db.models import OrderModel, SubscriptionModel
+        import hashlib
+        import hmac
+        import json
 
-        oxapay = OxaPayClient()
+        from bot.db.models import (
+            AuditLogModel,
+            OrderModel,
+            PaymentModel,
+            PendingNotificationModel,
+            SubscriptionModel,
+        )
+        from bot.services.notifications import notify_bot_owner_payment
 
-        if not oxapay.verify_webhook_signature(payload, x_webhook_signature):
-            logger.warning("✗ Signature webhook OxaPay invalide")
-            raise HTTPException(status_code=403, detail="Signature invalide")
+        body = await request.body()
+        signature = request.headers.get("X-Oxapay-Signature", "") or request.headers.get("X-WEBHOOK-SIGNATURE", "")
+        secret = os.getenv("OXAPAY_WEBHOOK_SECRET", "")
 
-        order_id = payload.get('orderId')
-        status = payload.get('status')
+        if not secret or not signature:
+            raise HTTPException(status_code=401, detail="Missing signature")
 
-        if status == 'Paid':
-            order = OrderModel.get(order_id)
-            if order:
-                OrderModel.update_status(order_id, 'paid')
-                SubscriptionModel.create(
-                    guild_id=order['guild_id'],
-                    user_id=order['user_id'],
-                    plan=order['plan'],
-                    payment_id=order['id'],
-                    duration_days=30
-                )
-                logger.info(f"✓ OxaPay webhook: {order_id} payé et activé")
+        expected = hmac.new(secret.encode("utf-8"), body, hashlib.sha256).hexdigest()
+        if not hmac.compare_digest(expected, signature.lower()):
+            logger.warning(f"OxaPay: signature invalide depuis {request.client.host if request.client else 'unknown'}")
+            raise HTTPException(status_code=401, detail="Invalid signature")
 
+        try:
+            payload = json.loads(body)
+        except json.JSONDecodeError:
+            raise HTTPException(status_code=400, detail="Invalid JSON")
+
+        status = str(payload.get("status", "")).strip().lower()
+        if status not in {"paid", "completed"}:
+            return {"status": "ignored", "reason": f"status={status}"}
+
+        order_id = payload.get("order_id") or payload.get("orderId")
+        invoice_id = payload.get("invoice_id") or payload.get("trackId")
+        amount = float(payload.get("amount") or 0)
+        currency = payload.get("currency") or "EUR"
+
+        order = OrderModel.get(order_id) if order_id else None
+        if order and str(order.get("status", "")).lower() == "paid":
+            logger.info(f"OxaPay webhook idempotent: {order_id} deja traite")
+            return {"status": "already_processed"}
+
+        user_id = payload.get("user_id") or (order or {}).get("user_id")
+        guild_id = payload.get("guild_id") or (order or {}).get("guild_id")
+        plan = payload.get("plan") or (order or {}).get("plan")
+
+        if not all([user_id, guild_id, plan]):
+            logger.error(f"OxaPay webhook: contexte manquant pour {order_id}")
+            raise HTTPException(status_code=400, detail="Missing order context")
+
+        if order_id:
+            OrderModel.update_status(order_id, "paid", "OxaPay webhook")
+
+        payment_id = PaymentModel.create(
+            user_id=user_id,
+            guild_id=guild_id,
+            method="oxapay",
+            amount=amount,
+            currency=currency,
+            plan=plan,
+            order_id=order_id,
+            status="completed",
+            oxapay_invoice_id=invoice_id,
+        )
+        SubscriptionModel.create(
+            guild_id=guild_id,
+            user_id=user_id,
+            plan=plan,
+            payment_id=payment_id,
+            duration_days=30,
+        )
+        AuditLogModel.log(
+            actor_id=user_id,
+            action="payment.oxapay.success",
+            guild_id=guild_id,
+            details={"order_id": order_id, "amount": amount, "plan": plan},
+        )
+        PendingNotificationModel.add(
+            user_id,
+            f"✅ Paiement **{str(plan).upper()}** confirmé ! Abonnement actif.",
+        )
+
+        try:
+            await notify_bot_owner_payment(
+                user_id=user_id,
+                guild_id=guild_id,
+                plan=plan,
+                method="oxapay",
+                amount=amount,
+                order_id=order_id,
+            )
+        except Exception as notify_error:
+            logger.warning(f"OxaPay owner notification failed: {notify_error}")
+
+        logger.info(f"OxaPay: {order_id} traite pour guild {guild_id}")
         return {"status": "success"}
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"✗ Erreur webhook OxaPay: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        detail = "Processing error" if is_production() else str(e)
+        raise HTTPException(status_code=500, detail=detail)
 
 
 @app.exception_handler(HTTPException)
