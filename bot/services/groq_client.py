@@ -329,6 +329,53 @@ class GroqClient:
 
         return ""
 
+    def generate_staff_suggestion(self, messages: list, staff_language: str) -> str:
+        """Génère une suggestion courte de réponse pour le staff."""
+        if not self.api_keys or not messages:
+            return ""
+
+        conv_text = "\n".join([
+            f"[{m.get('author', '?')}]: {m.get('content', '')}"
+            for m in messages[-10:]
+            if (m.get("content") or "").strip()
+        ])
+        if not conv_text:
+            return ""
+
+        system = (
+            "You are a customer support assistant helping a staff member.\n"
+            "Based on the conversation, generate ONE concise, professional reply suggestion.\n"
+            "Rules:\n"
+            f"- Respond in: {staff_language}\n"
+            "- Maximum 3 sentences\n"
+            "- Be empathetic and solution-focused\n"
+            "- Do NOT add emojis\n"
+            "- Output ONLY the suggested reply text\n"
+        )
+
+        for attempt in range(len(self.api_keys)):
+            try:
+                client = self._get_client(force_key_index=attempt)
+                if not client:
+                    continue
+
+                completion = client.chat.completions.create(
+                    model=GROQ_MODEL_FAST,
+                    messages=[
+                        {"role": "system", "content": system},
+                        {"role": "user", "content": f"Conversation:\n{conv_text}\n\nSuggest a reply:"}
+                    ],
+                    temperature=0.6,
+                    max_tokens=150,
+                    stream=False,
+                )
+                res = (completion.choices[0].message.content or "").strip()
+                return strip_emojis(res) or ""
+            except Exception as e:
+                logger.warning(f"⚠ Clé Groq #{attempt + 1} suggestion staff: {str(e)[:80]}")
+
+        return ""
+
     def detect_payment_intent(self, message: str) -> bool:
         """Détecte si l'utilisateur exprime une intention d'achat ou de paiement."""
         if not self.api_keys or not message.strip():
