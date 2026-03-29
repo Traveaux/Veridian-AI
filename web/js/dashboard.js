@@ -863,22 +863,17 @@ function renderTickets(tickets) {
       urgent: "Prioritaire",
     };
     const priorityLabel = priorityLabelMap[priorityRaw] || priorityRaw;
-    const priorityClassMap = {
-      low: "priority-dot low",
-      medium: "priority-dot mid",
-      high: "priority-dot high",
-      urgent: "priority-dot high",
-    };
-    const priorityClass = priorityClassMap[priorityRaw] || "priority-dot mid";
     const tid = parseInt(String(t.id), 10);
+    const trClass = priorityRaw === "urgent" ? "priority-urgent" : "";
+    const userLanguage = t.user_language ? (LANG_NAMES[t.user_language] || String(t.user_language).toUpperCase()) : "—";
     return `
-    <tr>
+    <tr class="${trClass}">
       <td><span class="mono-id">#${Number.isFinite(tid) ? tid : escHtml(t.id)}</span></td>
       <td>${escHtml(t.user_username || String(t.user_id))}</td>
       <td><span class="${statusClass}">${escHtml(statusLabel)}</span></td>
       <td>
         <div style="display:flex;align-items:center;gap:6px">
-          <span class="${priorityClass}">${escHtml(priorityLabel)}</span>
+          <span class="priority-badge ${escAttr(priorityRaw)}">${escHtml(priorityLabel)}</span>
           ${Number.isFinite(tid) ? `
           <select data-ticket-priority-select data-ticket-id="${tid}" style="background:var(--surface);border:1px solid var(--border2);color:var(--text3);font-size:10px;border-radius:999px;padding:2px 6px;">
             <option value="low" ${priorityRaw === "low" ? "selected" : ""}>Bas</option>
@@ -888,7 +883,7 @@ function renderTickets(tickets) {
           </select>` : ""}
         </div>
       </td>
-      <td>${escHtml(LANG_NAMES[t.user_language] || (t.user_language || "").toUpperCase())}</td>
+      <td>${escHtml(userLanguage)}</td>
       <td>${escHtml(t.assigned_staff_name || "—")}</td>
       <td class="mono-grey">${date}</td>
       <td>
@@ -1694,7 +1689,9 @@ function initSettingsSave() {
 
     try {
       await apiPut(`/internal/guild/${state.currentGuild.id}/config`, cfg);
+      saveBtn.classList.add("saved");
       showToast("Configuration sauvegardée ✅", "success");
+      setTimeout(() => saveBtn.classList.remove("saved"), 1200);
     } catch (e) {
       showToast("Erreur: " + e.message, "error");
     } finally {
@@ -2026,48 +2023,54 @@ function initToggleSwitches() {
 // UI: TOAST
 // ─────────────────────────────────────────────────────────────
 
-function showToast(message, type = "info") {
+function showToast(message, type = "info", duration = 4000) {
   let container = document.getElementById("toast-container");
   if (!container) {
     container = document.createElement("div");
     container.id = "toast-container";
+    container.setAttribute("aria-live", "polite");
     container.style.cssText =
-      "position:fixed;bottom:24px;right:24px;z-index:99999;display:flex;flex-direction:column;gap:8px;";
+      "position:fixed;bottom:24px;right:24px;z-index:99999;display:flex;flex-direction:column;gap:8px;max-width:360px;";
     document.body.appendChild(container);
   }
 
+  const icons = {
+    success: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="16 8 10 14 8 12"/></svg>`,
+    error: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`,
+    warn: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`,
+    info: `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
+  };
   const colors = {
     success: "var(--accent)",
     error: "var(--red)",
     warn: "var(--yellow)",
     info: "var(--blue)",
   };
+  const color = colors[type] || colors.info;
 
   const toast = document.createElement("div");
   toast.style.cssText = `
-    padding:10px 16px;border-radius:8px;font-size:13px;font-weight:500;
-    background:var(--bg2);border:1px solid ${colors[type] || colors.info};
-    color:var(--text);box-shadow:0 4px 20px rgba(0,0,0,0.4);
-    display:flex;align-items:center;gap:8px;
-    animation:slideIn .2s ease;max-width:320px;
+    padding:12px 16px;border-radius:10px;font-size:12.5px;font-weight:500;
+    background:var(--bg2);border:1px solid ${color}33;color:var(--text);
+    box-shadow:0 4px 20px rgba(0,0,0,.5),0 0 0 1px ${color}11;
+    display:flex;align-items:center;gap:10px;animation:slideInRight .25s cubic-bezier(.34,1.56,.64,1);
+    cursor:pointer;user-select:none;
   `;
-  const icons = {
-    success: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>`,
-    error: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`,
-    warn: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>`,
-    info: `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="16" x2="12" y2="12"></line><line x1="12" y1="8" x2="12.01" y2="8"></line></svg>`
-  };
 
-  toast.innerHTML = `<span style="color:${colors[type]};display:flex;align-items:center">
-    ${icons[type] || icons.info}
-  </span> <span>${escHtml(message)}</span>`;
+  toast.innerHTML = `
+    <span style="color:${color};flex-shrink:0;display:flex">${icons[type] || icons.info}</span>
+    <span style="flex:1;line-height:1.5">${escHtml(message)}</span>
+    <span style="color:var(--text3);font-size:16px;line-height:1;flex-shrink:0;opacity:.5">×</span>
+  `;
+
+  const dismiss = () => {
+    toast.style.animation = "slideOutRight .2s ease forwards";
+    setTimeout(() => toast.remove(), 200);
+  };
+  toast.addEventListener("click", dismiss);
 
   container.appendChild(toast);
-  setTimeout(() => {
-    toast.style.opacity = "0";
-    toast.style.transition = "opacity .3s";
-    setTimeout(() => toast.remove(), 300);
-  }, 3500);
+  setTimeout(dismiss, duration);
 }
 
 // ─────────────────────────────────────────────────────────────

@@ -61,18 +61,17 @@ def _embed_color(raw: str | None) -> discord.Color:
     if not n:
         return discord.Color(COLOR_SUCCESS)
 
-    # Accept hex colors from dashboard (e.g. #4da6ff)
-    if n.startswith("#") and len(n) in (4, 7):
+    hex_raw = n.lstrip("#")
+    if len(hex_raw) in (3, 6) and all(c in "0123456789abcdef" for c in hex_raw):
         try:
-            if len(n) == 4:
-                n = "#" + "".join([c * 2 for c in n[1:]])
-            return discord.Color(int(n[1:], 16))
+            if len(hex_raw) == 3:
+                hex_raw = "".join(c * 2 for c in hex_raw)
+            return discord.Color(int(hex_raw, 16))
         except Exception:
-            return discord.Color(COLOR_SUCCESS)
+            pass
 
-    # Nuanced Veridian colors
     return {
-        "blue": discord.Color(COLOR_SUCCESS),   # Now green for theme consistency
+        "blue": discord.Color(0x4DA6FF),
         "green": discord.Color(COLOR_SUCCESS),
         "red": discord.Color(COLOR_CRITICAL),
         "yellow": discord.Color(COLOR_WARNING),
