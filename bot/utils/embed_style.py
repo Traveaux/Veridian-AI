@@ -26,6 +26,25 @@ _VARIATION_RE = re.compile(r"[\uFE0E\uFE0F\u200D]")
 _WHITESPACE_RE = re.compile(r"[ \t]{2,}")
 _MULTILINE_RE = re.compile(r"\n{3,}")
 
+_TRANSLATION_TITLES = {
+    "fr": "Traduction automatique dans la langue de l'utilisateur",
+    "en": "Automatic translation in the user's language",
+    "es": "Traducción automática al idioma del usuario",
+    "de": "Automatische Übersetzung in die Sprache des Nutzers",
+    "it": "Traduzione automatica nella lingua dell'utente",
+    "pt": "Tradução automática na língua do utilizador",
+    "nl": "Automatische vertaling in de taal van de gebruiker",
+    "ru": "Автоматический перевод на язык пользователя",
+    "zh": "自动翻译为用户语言",
+    "ja": "ユーザーの言語への自動翻訳",
+    "ar": "الترجمة التلقائية إلى لغة المستخدم",
+    "pl": "Automatyczne tłumaczenie na język użytkownika",
+    "th": "แปลอัตโนมัติเป็นภาษาของผู้ใช้",
+    "bn": "ব্যবহারকারীর ভাষায় স্বয়ংক্রিয় অনুবাদ",
+    "ko": "사용자 언어로의 자동 번역",
+    "hi": "उपयोगकर्ता की भाषा में स्वचालित अनुवाद",
+}
+
 
 def strip_emojis(text: str | None) -> str | None:
     if text is None:
@@ -46,7 +65,15 @@ def _wrap_with_border(text: str | None) -> str:
         return "_____"
     if text.startswith("_____\n") and text.endswith("\n_____"):
         return text
-    return f"_____\n\n{text}\n\n_____"
+    return f"_____\n{text}"
+
+
+def translation_embed_title(language_code: str | None) -> str:
+    code = (language_code or "").strip().lower()
+    if not code:
+        return _TRANSLATION_TITLES["fr"]
+    base = code.split("-")[0]
+    return _TRANSLATION_TITLES.get(base, _TRANSLATION_TITLES["en"])
 
 
 def style_embed(embed: discord.Embed) -> discord.Embed:
@@ -69,21 +96,17 @@ def style_embed(embed: discord.Embed) -> discord.Embed:
         value = strip_emojis(field.value) or "-"
         embed.set_field_at(index, name=name, value=value, inline=field.inline)
 
-    if embed.fields:
-        first = embed.fields[0]
-        if not (first.name == "\u200b" and first.value == "_____"):
-            embed.insert_field_at(0, name="\u200b", value="_____", inline=False)
-
-        last = embed.fields[-1]
-        if not (last.name == "\u200b" and last.value == "_____"):
-            embed.add_field(name="\u200b", value="_____", inline=False)
-
     if embed.footer.text:
         footer_text = strip_emojis(embed.footer.text)
         if footer_text:
-            embed.set_footer(text=footer_text, icon_url=embed.footer.icon_url)
+            if footer_text.endswith("_____"):
+                footer_value = footer_text
+            else:
+                footer_value = f"{footer_text}\n_____"
+            embed.set_footer(text=footer_value, icon_url=embed.footer.icon_url)
         else:
-            embed.set_footer(text="", icon_url=embed.footer.icon_url)
+            embed.set_footer(text="_____", icon_url=embed.footer.icon_url)
+    else:
+        embed.set_footer(text="_____")
 
     return embed
-

@@ -18,7 +18,7 @@ from bot.services.translator import TranslatorService
 from bot.services.groq_client import GroqClient
 from bot.config import TICKET_CHANNEL_PREFIX, BOT_OWNER_DISCORD_ID
 from bot.config import COLOR_SUCCESS, COLOR_NOTICE, COLOR_WARNING, COLOR_CRITICAL
-from bot.utils.embed_style import style_embed
+from bot.utils.embed_style import style_embed, translation_embed_title
 
 LANGUAGE_NAMES = {
     "fr": "Français", "en": "Anglais", "es": "Espagnol", 
@@ -955,7 +955,7 @@ class TicketsCog(commands.Cog):
                     target_language = staff_lang
 
                     embed = discord.Embed(
-                        title="Traduction automatique dans la langue de l'utilisateur",
+                        title=translation_embed_title(user_lang),
                         description=translated_text[:3900],
                         color=discord.Color(COLOR_NOTICE if from_cache else COLOR_SUCCESS),
                         timestamp=message.created_at
@@ -1097,7 +1097,7 @@ class TicketsCog(commands.Cog):
                 target_language = user_lang
 
                 embed = discord.Embed(
-                    title="Traduction automatique dans la langue de l'utilisateur",
+                    title=translation_embed_title(user_lang),
                     description=(
                         f"Traduction · {get_lang_name(staff_src_lang)} vers {get_lang_name(user_lang)} · "
                         f"{'backend cache' if from_cache else 'api'}\n\n"
