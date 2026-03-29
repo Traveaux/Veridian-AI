@@ -11,6 +11,7 @@ from bot.services.groq_client import GroqClient
 from bot.services.translator import TranslatorService
 from bot.config import MIN_MESSAGE_LENGTH, PLAN_LIMITS, DASHBOARD_URL
 from bot.config import COLOR_SUCCESS, COLOR_NOTICE, COLOR_WARNING, COLOR_CRITICAL
+from bot.utils.embed_style import style_embed
 
 
 class SupportCog(commands.Cog):
@@ -95,7 +96,7 @@ class SupportCog(commands.Cog):
                                     ),
                                     color=color
                                 )
-                                await log_channel.send(embed=alert_embed)
+                                await log_channel.send(embed=style_embed(alert_embed))
                                 logger.warning(f"Alerte secu IA ({security_status}) pour {message.author.id}")
                 except Exception as e:
                     logger.debug(f"AI Moderation check failed: {e}")
@@ -140,7 +141,7 @@ class SupportCog(commands.Cog):
             value="Illimite | Toutes langues | KB illimitee | Suggestions staff | Stats avancees",
             inline=False
         )
-        await interaction.followup.send(embed=embed, ephemeral=True)
+        await interaction.followup.send(embed=style_embed(embed), ephemeral=True)
 
     # ------------------------------------------------------------------
     # /status
@@ -167,7 +168,7 @@ class SupportCog(commands.Cog):
                 )
                 embed.add_field(name="Expire le", value=str(expires))
             embed.set_footer(text=f"Utilisez /pay ou visitez {DASHBOARD_URL}")
-            await interaction.followup.send(embed=embed, ephemeral=True)
+            await interaction.followup.send(embed=style_embed(embed), ephemeral=True)
         except Exception as e:
             logger.error(f"Erreur subscription_status: {e}")
             await interaction.followup.send(f"Erreur : {e}", ephemeral=True)

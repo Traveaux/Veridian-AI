@@ -18,7 +18,7 @@ from bot.services.translator import TranslatorService
 from bot.services.groq_client import GroqClient
 from bot.config import TICKET_CHANNEL_PREFIX, BOT_OWNER_DISCORD_ID
 from bot.config import COLOR_SUCCESS, COLOR_NOTICE, COLOR_WARNING, COLOR_CRITICAL
-from bot.config import EMOJI_AI_API, EMOJI_AI_CACHE, EMOJI_ANIM_TICKET
+from bot.utils.embed_style import style_embed
 
 LANGUAGE_NAMES = {
     "fr": "Français", "en": "Anglais", "es": "Espagnol", 
@@ -540,7 +540,7 @@ class TicketsCog(commands.Cog):
                             description="Ce ticket a été fermé car il était inactif depuis plus de 3 jours.",
                             color=discord.Color(COLOR_NOTICE)
                         )
-                        await channel.send(embed=embed)
+                        await channel.send(embed=style_embed(embed))
                         # We trigger the close logic (summary, etc.)
                         # Since we don't have an interaction, we call a helper or the model directly.
                         # For simplicity, we just close it in DB and log it.
@@ -638,7 +638,7 @@ class TicketsCog(commands.Cog):
             title="Ticket de Support",
             color=_embed_color(cfg.get("ticket_welcome_color")),
             description=(
-                f"{EMOJI_ANIM_TICKET} Le ticket est prêt. Utilisez les boutons ci-dessous pour l’assignation."
+                "Le ticket est prêt. Utilisez les boutons ci-dessous pour l'assignation."
             ),
         )
         embed.add_field(name="Message utilisateur", value=_truncate_block(_render_template(user_template, variables)), inline=False)
@@ -689,7 +689,7 @@ class TicketsCog(commands.Cog):
                 status=ticket.get("status"),
                 assigned_staff_name=ticket.get("assigned_staff_name"),
             )
-            await welcome_msg.edit(embed=embed, view=TicketControlView(ticket_id, self.bot))
+            await welcome_msg.edit(embed=style_embed(embed), view=TicketControlView(ticket_id, self.bot))
         except Exception as e:
             logger.debug(f"Update welcome embed failed for ticket {ticket_id}: {e}")
 
@@ -768,7 +768,7 @@ class TicketsCog(commands.Cog):
                 inline=True,
             )
             base_embed.add_field(name="Assigné à", value=f"`{assigned_label}`", inline=True)
-            await channel.send(embed=base_embed)
+            await channel.send(embed=style_embed(base_embed))
 
             if transcript_user and user_lang and user_lang != staff_lang:
                 user_embed = discord.Embed(
@@ -776,7 +776,7 @@ class TicketsCog(commands.Cog):
                     description=transcript_user,
                     color=discord.Color(COLOR_SUCCESS),
                 )
-                await channel.send(embed=user_embed)
+                await channel.send(embed=style_embed(user_embed))
         except Exception as e:
             logger.debug(f"Envoi resume fermeture ignore: {e}")
 
@@ -809,7 +809,7 @@ class TicketsCog(commands.Cog):
                     if metrics.get("open_duration"):
                         user_embed.add_field(name="Durée totale", value=f"`{metrics['open_duration']}`", inline=True)
                     user_embed.set_footer(text=f"Ticket #{ticket['id']} · {guild.name if guild else ''}")
-                    await user.send(embed=user_embed, file=user_file)
+                    await user.send(embed=style_embed(user_embed), file=user_file)
             except Exception:
                 pass
 
@@ -864,7 +864,7 @@ class TicketsCog(commands.Cog):
                         value=_truncate_block("\n\n".join(summary_bits), 1024),
                         inline=False,
                     )
-                    await log_chan.send(embed=meta, files=files)
+                    await log_chan.send(embed=style_embed(meta), files=files)
         except Exception as e:
             logger.debug(f"Erreur logs/DMs fermeture: {e}")
 
@@ -961,7 +961,7 @@ class TicketsCog(commands.Cog):
                         timestamp=message.created_at
                     )
                     embed.set_footer(text=message.author.display_name, icon_url=message.author.display_avatar.url)
-                    await message.channel.send(embed=embed, reference=message, mention_author=False)
+                    await message.channel.send(embed=style_embed(embed), reference=message, mention_author=False)
                     logger.debug(f"Traduction user->staff envoyee pour ticket {ticket['id']}")
                 except Exception as e:
                     logger.error(f"Erreur traduction ticket {ticket['id']}: {e}")
@@ -972,8 +972,7 @@ class TicketsCog(commands.Cog):
                     payment_embed = discord.Embed(
                         title="Veridian AI - Plans & Tarifs",
                         description=(
-                            f"[ticket.gif]({EMOJI_URL_TICKET})\n\n"
-                            "Il semble que vous soyez intéressé par nos offres !\n\n"
+                            "Il semble que vous soyez interesse par nos offres !\n\n"
                             "**Plan Premium (5€/mois)**\n"
                             "- Support IA illimité\n"
                             "- Traduction automatique des tickets\n"
@@ -987,7 +986,7 @@ class TicketsCog(commands.Cog):
                         color=discord.Color(COLOR_WARNING)
                     )
                     payment_embed.set_footer(text="Paiement sécurisé via Carte ou Crypto (OxaPay)")
-                    await message.channel.send(embed=payment_embed)
+                    await message.channel.send(embed=style_embed(payment_embed))
                     logger.info(f"Suggestion paiement envoyée pour ticket {ticket['id']}")
             except Exception as e:
                 logger.debug(f"Payment suggestion failed for ticket {ticket['id']}: {e}")
@@ -1011,7 +1010,7 @@ class TicketsCog(commands.Cog):
                                 ),
                                 color=color
                             )
-                            await log_channel.send(embed=alert_embed)
+                            await log_channel.send(embed=style_embed(alert_embed))
                             logger.warning(f"Alerte secu ticket ({security_status}) pour {message.author.id}")
             except Exception as e:
                 logger.debug(f"AI Moderation check failed for ticket: {e}")
@@ -1100,14 +1099,13 @@ class TicketsCog(commands.Cog):
                 embed = discord.Embed(
                     title="Traduction automatique dans la langue de l'utilisateur",
                     description=(
-                        f"utilisateur : {EMOJI_AI_CACHE if from_cache else EMOJI_AI_API} Traduction · "
-                        f"{get_lang_name(staff_src_lang)} → {get_lang_name(user_lang)} · "
-                        f"{'backend (cache)' if from_cache else 'api'}\n\n"
+                        f"Traduction · {get_lang_name(staff_src_lang)} vers {get_lang_name(user_lang)} · "
+                        f"{'backend cache' if from_cache else 'api'}\n\n"
                         f"{translated_text[:3900]}"
                     ),
                     color=discord.Color(COLOR_NOTICE if from_cache else COLOR_SUCCESS),
                 )
-                await message.channel.send(embed=embed, reference=message, mention_author=False)
+                await message.channel.send(embed=style_embed(embed), reference=message, mention_author=False)
                 logger.debug(f"Traduction staff->user envoyee pour ticket {ticket['id']}")
             except Exception as e:
                 logger.error(f"Erreur traduction ticket {ticket['id']}: {e}")
@@ -1288,7 +1286,7 @@ class TicketsCog(commands.Cog):
             assigned_staff_name=None,
         )
         view = TicketControlView(ticket_id, self.bot)
-        welcome_msg = await ticket_channel.send(embed=embed, view=view)
+        welcome_msg = await ticket_channel.send(embed=style_embed(embed), view=view)
 
         # Mention staff role if enabled
         try:
@@ -1651,7 +1649,7 @@ class TicketControlView(discord.ui.View):
             description=(ticket.get("transcript") or "")[:4000],
             color=discord.Color(COLOR_NOTICE),
         )
-        await interaction.response.send_message(embed=embed, ephemeral=True, file=file)
+        await interaction.response.send_message(embed=style_embed(embed), ephemeral=True, file=file)
 
 
 async def setup(bot):
