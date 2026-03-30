@@ -200,7 +200,10 @@ async def get_all_subscriptions(auth: dict = Depends(verify_super_admin)):
         from bot.db.connection import get_db_context
         with get_db_context() as conn:
             cursor = conn.cursor(dictionary=True)
-            cursor.execute("SELECT * FROM vai_subscriptions WHERE expires_at > NOW()")
+            cursor.execute(
+                "SELECT * FROM vai_subscriptions "
+                "WHERE is_active = 1 AND (expires_at IS NULL OR expires_at > NOW())"
+            )
             return cursor.fetchall()
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -239,14 +242,7 @@ async def revoke_subscription(
     """Révoque manuellement un abonnement."""
     try:
         guild_id = int(req.guild_id)
-        # We don't have a direct 'revoke' in SubscriptionModel, so we manually expire it
-        from bot.db.connection import get_db_context
-        with get_db_context() as conn:
-            cursor = conn.cursor()
-            cursor.execute(
-                "UPDATE vai_subscriptions SET expires_at = NOW() WHERE guild_id = %s", 
-                (guild_id,)
-            )
+        SubscriptionModel.deactivate(guild_id)
         AuditLogModel.log(
             actor_id=auth["user_id"],
             actor_username=auth.get("username", "Super Admin"),

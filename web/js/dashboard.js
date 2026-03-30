@@ -1145,24 +1145,53 @@ async function loadOrders() {
   try {
     const stats = await apiFetch(`/internal/guild/${state.currentGuild.id}/stats`, { auth: true });
     const plan = String(stats.current_plan || "free").toLowerCase();
+    const subStatus = String(stats.subscription_status || (plan === "free" ? "free" : "active")).toLowerCase();
+    const expiresAt = stats.expires_at || null;
+    const expiresSoon = Number(stats.days_until_expiry || 0) > 0 && Number(stats.days_until_expiry || 0) <= 5;
+    const lastPlan = String(stats.last_subscription_plan || plan || "free").toLowerCase();
     state.guildMeta[state.currentGuild.id] = { ...(state.guildMeta[state.currentGuild.id] || {}), plan };
     updateServerPlanDisplay();
 
-    if (planEl) planEl.textContent = formatPlanLabel(plan);
+    if (planEl) {
+      planEl.textContent = subStatus === "expired"
+        ? `${formatPlanLabel(lastPlan)} (expiré)`
+        : formatPlanLabel(plan);
+    }
     if (priceEl) {
-      priceEl.textContent =
-        plan === "premium" ? "— 2€/mois" :
-        plan === "pro" ? "— 5€/mois" :
-        "— 0€/mois";
+      const basePrice =
+        plan === "premium" ? "2€/mois" :
+        plan === "pro" ? "5€/mois" :
+        "0€/mois";
+      priceEl.textContent = expiresAt
+        ? `— ${basePrice} · Expire le ${formatDateLabel(expiresAt)}`
+        : `— ${basePrice}`;
     }
     if (statusEl) {
-      statusEl.className = `pill ${plan === "free" ? "free" : plan === "premium" ? "premium" : "pro"}`;
-      statusEl.textContent = formatPlanLabel(plan);
+      if (subStatus === "expired") {
+        statusEl.className = "pill rejected";
+        statusEl.textContent = "Expiré";
+      } else if (expiresSoon) {
+        statusEl.className = "pill pending";
+        statusEl.textContent = "Expire bientôt";
+      } else {
+        statusEl.className = `pill ${plan === "free" ? "free" : plan === "premium" ? "premium" : "pro"}`;
+        statusEl.textContent = formatPlanLabel(plan);
+      }
     }
     if (noteEl) {
-      noteEl.textContent = plan === "free"
-        ? "Passez à Premium ou Pro avec les sélecteurs ci-dessous pour débloquer plus de tickets, de langues et d'options."
-        : "Votre serveur dispose déjà d'un abonnement actif. Vous pouvez le renouveler ou le faire évoluer directement depuis cette page.";
+      if (subStatus === "expired") {
+        noteEl.textContent =
+          `Votre abonnement ${formatPlanLabel(lastPlan)} a expiré${expiresAt ? ` le ${formatDateLabel(expiresAt)}` : ""}. ` +
+          "Vous devez repayer pour le réactiver. Sans renouvellement, les options de ce plan restent désactivées.";
+      } else if (expiresSoon) {
+        noteEl.textContent =
+          `Votre abonnement expire${expiresAt ? ` le ${formatDateLabel(expiresAt)}` : " bientôt"}. ` +
+          "Repayez avant cette date pour qu'il reste actif et pour éviter la désactivation des options du plan.";
+      } else if (plan === "free") {
+        noteEl.textContent = "Passez à Premium ou Pro avec les sélecteurs ci-dessous pour débloquer plus de tickets, de langues et d'options.";
+      } else {
+        noteEl.textContent = "Votre serveur dispose d'un abonnement actif. Vous pouvez le renouveler ou le faire évoluer directement depuis cette page.";
+      }
     }
 
     if (plan === "pro") {

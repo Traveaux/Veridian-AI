@@ -695,9 +695,41 @@ def get_guild_stats(guild_id: int):
     except Exception:
         subscription = None
     try:
+        subscription_record = SubscriptionModel.get_record(guild_id)
+    except Exception:
+        subscription_record = None
+    try:
         kb_count = KnowledgeBaseModel.count(guild_id)
     except Exception:
         kb_count = 0
+
+    now = datetime.now()
+    expires_at = None
+    subscription_status = "free"
+    renewal_required = False
+    days_until_expiry = None
+    last_subscription_plan = None
+
+    if subscription:
+        subscription_status = "active"
+        last_subscription_plan = subscription.get("plan")
+        expires_at = subscription.get("expires_at")
+        if expires_at:
+            try:
+                delta = expires_at - now
+                days_until_expiry = max(0, delta.days + (1 if delta.seconds > 0 else 0))
+            except Exception:
+                days_until_expiry = None
+    elif subscription_record and subscription_record.get("expires_at"):
+        last_subscription_plan = subscription_record.get("plan")
+        expires_at = subscription_record.get("expires_at")
+        try:
+            if expires_at <= now or int(subscription_record.get("is_active") or 0) == 0:
+                subscription_status = "expired"
+                renewal_required = True
+        except Exception:
+            subscription_status = "expired"
+            renewal_required = True
 
     return {
         "guild_id":           guild_id,
@@ -709,7 +741,12 @@ def get_guild_stats(guild_id: int):
         "daily_counts":       daily_counts,
         "current_plan":       subscription["plan"] if subscription else "free",
         "is_subscribed":      bool(subscription),
-        "kb_entries":         kb_count
+        "kb_entries":         kb_count,
+        "subscription_status": subscription_status,
+        "renewal_required":   renewal_required,
+        "last_subscription_plan": last_subscription_plan,
+        "expires_at":         str(expires_at) if expires_at else None,
+        "days_until_expiry":  days_until_expiry,
     }
 
 
