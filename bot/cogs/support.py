@@ -165,21 +165,51 @@ class SupportCog(commands.Cog):
         await interaction.response.defer(ephemeral=True)
         try:
             sub = SubscriptionModel.get(interaction.guild.id)
-            if not sub:
+            record = sub or SubscriptionModel.get_record(interaction.guild.id)
+
+            if not record:
                 embed = discord.Embed(
                     title="Abonnement",
                     description="Ce serveur est en plan **Free**.",
                     color=discord.Color(COLOR_NOTICE)
                 )
             else:
-                plan    = sub["plan"].upper()
-                expires = sub.get("expires_at", "Indefini")
-                embed   = discord.Embed(
-                    title="Abonnement",
-                    description=f"Ce serveur est en plan **{plan}**.",
-                    color=discord.Color(COLOR_SUCCESS)
-                )
-                embed.add_field(name="Expire le", value=str(expires))
+                plan = str(record.get("plan") or "free").upper()
+                expires = record.get("expires_at") or "Indefini"
+                is_active = bool(sub) and int(record.get("is_active", 0) or 0) == 1
+
+                if is_active:
+                    embed = discord.Embed(
+                        title="Abonnement",
+                        description=f"Ce serveur est en plan **{plan}**.",
+                        color=discord.Color(COLOR_SUCCESS)
+                    )
+                    embed.add_field(name="Statut", value="Actif", inline=True)
+                    embed.add_field(name="Expire le", value=str(expires), inline=True)
+                    embed.add_field(
+                        name="Renouvellement",
+                        value=(
+                            "Repayez avant cette date pour qu'il reste actif et pour "
+                            "eviter la desactivation des options du plan."
+                        ),
+                        inline=False
+                    )
+                else:
+                    embed = discord.Embed(
+                        title="Abonnement",
+                        description=f"L'abonnement **{plan}** de ce serveur a expire.",
+                        color=discord.Color(COLOR_WARNING)
+                    )
+                    embed.add_field(name="Statut", value="Expire", inline=True)
+                    embed.add_field(name="Expire le", value=str(expires), inline=True)
+                    embed.add_field(
+                        name="Action requise",
+                        value=(
+                            "Vous devez repayer pour le reactiver. Tant qu'il n'est pas "
+                            "renouvele, les options de ce plan restent desactivees."
+                        ),
+                        inline=False
+                    )
             embed.set_footer(text=f"Utilisez /pay ou visitez {DASHBOARD_URL}")
             await interaction.followup.send(embed=style_embed(embed), ephemeral=True)
         except Exception as e:
