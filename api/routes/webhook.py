@@ -114,6 +114,9 @@ async def oxapay_webhook(request: Request):
                 payment_id=payment_id,
                 duration_days=30
             )
+            sub = SubscriptionModel.get(guild_id) or {}
+            expiry = sub.get("expires_at")
+            expiry_label = expiry.strftime("%d/%m/%Y") if hasattr(expiry, "strftime") else str(expiry or "date non disponible")
 
             # 4. Enregistrer l'action dans les logs d'audit
             AuditLogModel.log(
@@ -124,7 +127,11 @@ async def oxapay_webhook(request: Request):
             )
 
             # 5. Notifier l'utilisateur via notification pendante (sera envoyée par le bot)
-            msg = f"✅ Votre paiement Crypto (**{plan.upper()}**) a été validé ! Votre abonnement est actif."
+            msg = (
+                f"✅ Votre paiement Crypto (**{plan.upper()}**) a ete valide.\n"
+                f"Abonnement actif jusqu'au **{expiry_label}**.\n"
+                "Repayez avant cette date pour le garder actif et pour eviter la desactivation des options du plan."
+            )
             PendingNotificationModel.add(user_id, msg)
         except Exception as e:
             logger.error(f"Erreur lors du traitement du paiement OxaPay: {e}")

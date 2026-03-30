@@ -12,7 +12,7 @@ from bot.db.connection import get_db_context
 from bot.db.models import (
     GuildModel, TicketModel, UserModel, SubscriptionModel,
     OrderModel, PaymentModel, KnowledgeBaseModel, AuditLogModel,
-    BotStatusModel, TicketMessageModel, AuditLogModel
+    BotStatusModel, TicketMessageModel, AuditLogModel, PendingNotificationModel
 )
 from bot.config import PLAN_LIMITS, DB_TABLE_PREFIX, PRICING, DASHBOARD_URL
 from bot.services.oxapay import OxaPayClient
@@ -882,6 +882,17 @@ def update_order_status(order_id: str, body: OrderStatusBody, request: Request):
             plan=plan,
             payment_id=payment_id,
             duration_days=30
+        )
+        sub = SubscriptionModel.get(order["guild_id"]) or {}
+        expiry = sub.get("expires_at")
+        expiry_label = expiry.strftime("%d/%m/%Y") if hasattr(expiry, "strftime") else str(expiry or "date non disponible")
+        PendingNotificationModel.add(
+            order["user_id"],
+            (
+                f"✅ Votre commande **{order_id}** ({plan.upper()}) a ete validee.\n"
+                f"Expiration : **{expiry_label}**.\n"
+                "Repayez avant cette date pour garder l'abonnement actif et eviter la desactivation des options de votre plan."
+            )
         )
         logger.info(f"Abonnement {plan} active pour guild {order['guild_id']}")
 

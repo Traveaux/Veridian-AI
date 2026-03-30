@@ -97,6 +97,9 @@ async def validate_order(
             payment_id=payment_id,
             duration_days=30
         )
+        sub = SubscriptionModel.get(order["guild_id"]) or {}
+        expiry = sub.get("expires_at")
+        expiry_label = expiry.strftime("%d/%m/%Y") if hasattr(expiry, "strftime") else str(expiry or "date non disponible")
         
         # 4. Audit Log
         AuditLogModel.log(
@@ -109,8 +112,9 @@ async def validate_order(
         
         # 5. Notify User via DM
         message = (
-            f"✅ Votre commande **{order_id}** ({order['plan'].upper()}) a été validée !\n"
-            f"Votre abonnement est maintenant actif sur le serveur."
+            f"✅ Votre commande **{order_id}** ({order['plan'].upper()}) a ete validee.\n"
+            f"Votre abonnement est actif jusqu'au **{expiry_label}**.\n\n"
+            "Repayez avant cette date pour qu'il reste actif et pour eviter la desactivation des options de votre plan."
         )
         PendingNotificationModel.add(order["user_id"], message)
         

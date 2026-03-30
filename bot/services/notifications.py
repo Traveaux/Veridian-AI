@@ -6,10 +6,19 @@ La validation se fait via le dashboard. Les boutons DM restent comme raccourci r
 import discord
 from loguru import logger
 from typing import Optional
+from datetime import datetime
 from bot.config import BOT_OWNER_DISCORD_ID, DASHBOARD_URL
 from bot.config import COLOR_SUCCESS, COLOR_NOTICE, COLOR_WARNING, COLOR_CRITICAL
-from bot.db.models import OrderModel, SubscriptionModel, PaymentModel, AuditLogModel
+from bot.db.models import OrderModel, SubscriptionModel, PaymentModel, AuditLogModel, PendingNotificationModel
 from bot.utils.embed_style import style_embed
+
+
+def _format_expiry(expires_at) -> str:
+    if not expires_at:
+        return "date non disponible"
+    if isinstance(expires_at, datetime):
+        return expires_at.strftime("%d/%m/%Y")
+    return str(expires_at)
 
 
 class NotificationService:
@@ -100,16 +109,20 @@ class NotificationService:
         except Exception as e:
             logger.error(f"Erreur notification carte cadeau: {e}")
 
-    async def notify_user_payment_confirmed(self, user_id: int, plan: str, guild_id: int):
+    async def notify_user_payment_confirmed(self, user_id: int, plan: str, guild_id: int, expires_at=None):
         try:
             user  = await self.bot.fetch_user(user_id)
             guild = self.bot.get_guild(guild_id)
+            expiry_label = _format_expiry(expires_at)
             embed = discord.Embed(
                 title="Paiement confirme",
                 color=discord.Color(COLOR_SUCCESS),
                 description=(
                     f"Votre abonnement **{plan.upper()}** est actif"
-                    f" sur **{guild.name if guild else guild_id}**. Merci !"
+                    f" sur **{guild.name if guild else guild_id}**.\n"
+                    f"Expiration : **{expiry_label}**.\n\n"
+                    "Pensez a repayer avant cette date pour qu'il reste actif "
+                    "et pour eviter la desactivation des options de votre plan."
                 )
             )
             await user.send(embed=style_embed(embed))
@@ -199,8 +212,9 @@ class PaymentButtonView(discord.ui.View):
                 guild_id=order["guild_id"], user_id=order["user_id"],
                 plan=plan, payment_id=payment_id, duration_days=30
             )
+            sub = SubscriptionModel.get(order["guild_id"]) or {}
             await notif.notify_user_payment_confirmed(
-                order["user_id"], plan, order["guild_id"]
+                order["user_id"], plan, order["guild_id"], sub.get("expires_at")
             )
             label = "Valide et abonnement active"
 
@@ -229,3 +243,28 @@ class PaymentButtonView(discord.ui.View):
     @discord.ui.button(label="Montant incomplet", style=discord.ButtonStyle.secondary)
     async def partial_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         await self._validate(interaction, "partial")
+
+
+async def notify_bot_owner_payment(
+    user_id: int,
+    guild_id: int,
+    plan: str,
+    method: str,
+    amount: float,
+    order_id: str | None = None,
+):
+    """Ajoute une notification DM au owner via la file d'attente du bot."""
+    try:
+        message = (
+            "Nouvelle confirmation de paiement.\n"
+            f"Methode : {str(method).upper()}\n"
+            f"Plan : {str(plan).upper()}\n"
+            f"Montant : {float(amount or 0):.2f} EUR\n"
+            f"Guild ID : {guild_id}\n"
+            f"User ID : {user_id}\n"
+            f"Reference : {order_id or 'n/a'}\n"
+            f"Panel : {DASHBOARD_URL}"
+        )
+        PendingNotificationModel.add(BOT_OWNER_DISCORD_ID, message)
+    except Exception as e:
+        logger.warning(f"Impossible de notifier le Bot Owner pour un paiement: {e}")

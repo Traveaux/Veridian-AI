@@ -345,6 +345,9 @@ async def oxapay_webhook(request: Request):
             payment_id=payment_id,
             duration_days=30,
         )
+        sub = SubscriptionModel.get(guild_id) or {}
+        expiry = sub.get("expires_at")
+        expiry_label = expiry.strftime("%d/%m/%Y") if hasattr(expiry, "strftime") else str(expiry or "date non disponible")
         AuditLogModel.log(
             actor_id=user_id,
             action="payment.oxapay.success",
@@ -353,7 +356,11 @@ async def oxapay_webhook(request: Request):
         )
         PendingNotificationModel.add(
             user_id,
-            f"✅ Paiement **{str(plan).upper()}** confirmé ! Abonnement actif.",
+            (
+                f"✅ Paiement **{str(plan).upper()}** confirme. "
+                f"Abonnement actif jusqu'au **{expiry_label}**.\n"
+                "Repayez avant cette date pour le garder actif et pour eviter la desactivation des options du plan."
+            ),
         )
 
         try:
