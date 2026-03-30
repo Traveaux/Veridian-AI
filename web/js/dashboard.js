@@ -1272,7 +1272,7 @@ function renderBillingSelection() {
     method === "oxapay"
       ? "Paiement automatique via OxaPay. Une page de paiement sera générée avec la référence de commande."
       : method === "paypal"
-        ? "Une commande manuelle sera créée avec la référence et les instructions PayPal."
+        ? "Une commande manuelle sera créée avec la référence et les instructions PayPal. La référence doit être ajoutée dans la note ou le message vendeur."
         : "Une commande manuelle sera créée. Vous pourrez transmettre votre code de carte cadeau avec la référence.";
 }
 
@@ -1289,6 +1289,7 @@ function renderBillingPurchaseFeedback(data) {
   if (!box) return;
 
   const payment = data.payment || {};
+  const descriptionHtml = escHtml(payment.description || "").replace(/\n/g, "<br>");
   const actionUrl = payment.action_url ? `
     <a class="btn btn-primary btn-sm" href="${escAttr(payment.action_url)}" target="_blank" rel="noopener noreferrer">
       ${escHtml(payment.action_label || "Continuer")}
@@ -1301,10 +1302,17 @@ function renderBillingPurchaseFeedback(data) {
   box.innerHTML = `
     <div class="billing-kicker">COMMANDE CRÉÉE</div>
     <div style="font-size:13px;font-weight:700;color:var(--text)">${escHtml(payment.title || "Paiement prêt")}</div>
-    <div style="font-size:11.5px;color:var(--text2);line-height:1.65;margin-top:6px">${escHtml(payment.description || "")}</div>
+    <div style="font-size:11.5px;color:var(--text2);line-height:1.65;margin-top:6px">${descriptionHtml}</div>
     <div style="font-size:11px;color:var(--text3);font-family:'Space Mono',monospace;margin-top:10px">Référence: ${escHtml(reference || "—")}</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">${actionUrl}</div>
   `;
+}
+
+function formatDateLabel(raw) {
+  if (!raw) return "date indisponible";
+  const dt = new Date(raw);
+  if (!Number.isNaN(dt.getTime())) return dt.toLocaleDateString("fr-FR");
+  return String(raw);
 }
 
 async function submitBillingPurchase() {

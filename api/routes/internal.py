@@ -792,8 +792,18 @@ async def create_dashboard_purchase(guild_id: int, body: PurchaseBody, request: 
                 "mode": "manual",
                 "title": "Paiement PayPal",
                 "description": (
-                    f"Envoyez {amount:.2f} EUR a {paypal_email} puis gardez la reference {order_id}. "
-                    "La validation est manuelle."
+                    "Etapes pour payer via PayPal :\n\n"
+                    "1. Allez sur paypal.com -> Envoyer de l'argent\n"
+                    f"2. Entrez l'adresse : {paypal_email}\n"
+                    f"3. Montant : {amount:.2f} EUR\n"
+                    "4. Sur mobile : appuyez sur Ajouter une note\n"
+                    "   Sur ordinateur : cliquez sur Ajouter un message\n"
+                    "5. Dans ce champ, ecrivez exactement la reference ci-dessous\n"
+                    "6. Envoyez le paiement\n\n"
+                    "Mobile PayPal : Envoyer -> [montant] -> Selectionner contact -> Ajouter une note\n"
+                    "Web PayPal : Envoyer de l'argent -> Payer pour des biens/services -> Ajouter un message au vendeur\n\n"
+                    "Sans cette reference dans le message PayPal, nous ne pourrons pas associer votre paiement a votre commande.\n"
+                    "Activation sous 24h apres reception et verification."
                 ),
                 "reference": order_id,
                 "payment_target": paypal_email,

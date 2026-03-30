@@ -19,6 +19,32 @@ from bot.config import COLOR_SUCCESS, COLOR_NOTICE, COLOR_WARNING, COLOR_CRITICA
 from bot.utils.embed_style import style_embed
 
 
+PAYPAL_INSTRUCTIONS_TEMPLATE = """
+**Etapes pour payer via PayPal :**
+
+1. Allez sur **paypal.com** -> Envoyer de l'argent
+2. Entrez l'adresse : `{paypal_email}`
+3. Montant : **{amount:.2f} EUR**
+4. **Sur mobile** : appuyez sur *Ajouter une note*
+   **Sur ordinateur** : cliquez sur *Ajouter un message*
+5. Dans ce champ, ecrivez **exactement** :
+```text
+{order_id}
+```
+6. Envoyez le paiement
+
+Mobile PayPal :
+Envoyer -> [montant] -> Selectionner contact -> Ajouter une note
+
+Web PayPal :
+Envoyer de l'argent -> Payer pour des biens/services -> Ajouter un message au vendeur
+
+Sans cette reference dans le message PayPal, nous ne pourrons pas associer votre paiement a votre commande.
+
+Activation sous 24h apres reception et verification.
+""".strip()
+
+
 class PaymentsCog(commands.Cog):
     """Gere les paiements : PayPal, Carte Cadeau, Crypto."""
 
@@ -103,21 +129,12 @@ class PaymentsCog(commands.Cog):
     async def _handle_paypal(self, interaction: discord.Interaction,
                               order_id: str, plan: str, amount: float):
         paypal_email = os.getenv("PAYPAL_EMAIL", "[Email PayPal non configure]")
-
-        embed = discord.Embed(
-            title="Paiement PayPal",
-            color=discord.Color(COLOR_NOTICE),
-            description=(
-                f"Plan : **{plan.upper()}** | Montant : **{amount:.2f} EUR**\n\n"
-                f"Envoyez **{amount:.2f} EUR** a : `{paypal_email}`\n"
-                f"Indiquez comme reference : **{order_id}**\n\n"
-                "Votre commande sera validee sous 24h via le panel d'administration.\n"
-                f"Suivi : {DASHBOARD_URL}"
-            )
+        message = PAYPAL_INSTRUCTIONS_TEMPLATE.format(
+            paypal_email=paypal_email,
+            amount=amount,
+            order_id=order_id,
         )
-        embed.set_footer(text="Sans la reference de commande, le paiement ne sera pas reconnu.")
-
-        await interaction.followup.send(embed=style_embed(embed), ephemeral=True)
+        await interaction.followup.send(message, ephemeral=True)
 
         await self.notifications.send_paypal_order_notification(
             interaction.user.id, order_id, plan, amount, interaction.guild.id
