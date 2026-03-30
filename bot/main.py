@@ -46,6 +46,14 @@ from bot.config import DASHBOARD_URL
 _bot_start_time: datetime | None = None
 _persistent_views_restored = False
 
+
+def _format_subscription_date(value) -> str:
+    if not value:
+        return "date indisponible"
+    if isinstance(value, datetime):
+        return value.strftime("%d/%m/%Y")
+    return str(value)
+
 # Fonction d'initialisation DB
 def initialize_database():
     """Initialise la base de données (DB_NAME) et applique le schema/migrations."""
@@ -164,9 +172,14 @@ async def on_ready():
     if not notification_processor_loop.is_running():
         notification_processor_loop.start()
         logger.info("✓ Notification processor démarré (intervalle: 60s)")
+
+    if not subscription_guard_loop.is_running():
+        subscription_guard_loop.start()
+        logger.info("✓ Subscription guard demarre (intervalle: 24h)")
     
     # Premier heartbeat immédiat
     await _update_bot_status()
+    await _process_subscription_reminders_and_expiry()
 
 
 @tasks.loop(seconds=30)
@@ -215,6 +228,65 @@ async def notification_processor_loop():
 @notification_processor_loop.before_loop
 async def before_notification_processor_loop():
     await bot.wait_until_ready()
+
+
+@tasks.loop(hours=24)
+async def subscription_guard_loop():
+    """Rappelle les expirations proches et desactive les abonnements echus."""
+    await _process_subscription_reminders_and_expiry()
+
+
+@subscription_guard_loop.before_loop
+async def before_subscription_guard_loop():
+    await bot.wait_until_ready()
+
+
+async def _process_subscription_reminders_and_expiry():
+    try:
+        from bot.db.models import PendingNotificationModel, SubscriptionModel
+
+        expiring = SubscriptionModel.list_expiring_for_reminder(days=5, limit=100)
+        for sub in expiring:
+            user_id = sub.get("user_id")
+            sub_id = sub.get("id")
+            if not user_id or not sub_id:
+                continue
+
+            guild_name = sub.get("guild_name") or f"serveur {sub.get('guild_id')}"
+            plan = str(sub.get("plan") or "premium").upper()
+            expires_label = _format_subscription_date(sub.get("expires_at"))
+            message = (
+                f"⏰ Votre abonnement **{plan}** sur **{guild_name}** expire le **{expires_label}**.\n\n"
+                "Pour qu'il reste actif, vous devez repayer avant cette date.\n"
+                "Sans renouvellement, les options de votre plan pourront etre desactivees.\n\n"
+                f"Renouvelez via `/pay` dans votre serveur ou depuis {DASHBOARD_URL}"
+            )
+            if PendingNotificationModel.add(int(user_id), message):
+                SubscriptionModel.mark_reminder_sent(int(sub_id))
+
+        expired = SubscriptionModel.list_expired_active(limit=100)
+        for sub in expired:
+            guild_id = sub.get("guild_id")
+            user_id = sub.get("user_id")
+            if not guild_id:
+                continue
+
+            SubscriptionModel.deactivate(int(guild_id))
+            if not user_id:
+                continue
+
+            guild_name = sub.get("guild_name") or f"serveur {guild_id}"
+            plan = str(sub.get("plan") or "premium").upper()
+            expires_label = _format_subscription_date(sub.get("expires_at"))
+            message = (
+                f"⚠️ Votre abonnement **{plan}** sur **{guild_name}** a expire le **{expires_label}**.\n\n"
+                "Vous devez repayer pour le reactiver.\n"
+                "Tant qu'il n'est pas renouvelle, les options de ce plan restent desactivees.\n\n"
+                f"Utilisez `/pay` dans votre serveur ou visitez {DASHBOARD_URL}"
+            )
+            PendingNotificationModel.add(int(user_id), message)
+    except Exception as e:
+        logger.error(f"Erreur gestion rappels/expirations abonnement: {e}")
 
 
 async def _deploy_ticket_open_messages():

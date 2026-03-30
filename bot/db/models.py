@@ -649,16 +649,21 @@ class SubscriptionModel:
 
                 query = f"""
                     INSERT INTO {DB_TABLE_PREFIX}subscriptions
-                    (guild_id, user_id, plan, started_at, expires_at, is_active, payment_id)
-                    VALUES (%s, %s, %s, NOW(), %s, 1, %s)
+                    (guild_id, user_id, plan, started_at, expires_at, is_active, reminder_sent, payment_id)
+                    VALUES (%s, %s, %s, NOW(), %s, 1, 0, %s)
                     ON DUPLICATE KEY UPDATE
                         plan = VALUES(plan),
                         started_at = NOW(),
                         expires_at = VALUES(expires_at),
                         is_active = 1,
+                        reminder_sent = 0,
                         payment_id = VALUES(payment_id)
                 """
                 cursor.execute(query, (guild_id, user_id, plan, expires_at, payment_id))
+                try:
+                    GuildModel.update(guild_id, tier=plan)
+                except Exception:
+                    pass
                 logger.info(f"Abonnement {plan} cree/mis a jour pour guild {guild_id}")
                 return True
             except Exception as e:
@@ -666,12 +671,25 @@ class SubscriptionModel:
                 return False
 
     @staticmethod
+    def get_record(guild_id: int) -> Optional[Dict]:
+        with get_db_context() as conn:
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute(
+                f"SELECT * FROM {DB_TABLE_PREFIX}subscriptions "
+                f"WHERE guild_id = %s",
+                (guild_id,)
+            )
+            return cursor.fetchone()
+
+    @staticmethod
     def get(guild_id: int) -> Optional[Dict]:
         with get_db_context() as conn:
             cursor = conn.cursor(dictionary=True)
             cursor.execute(
                 f"SELECT * FROM {DB_TABLE_PREFIX}subscriptions "
-                f"WHERE guild_id = %s AND is_active = 1",
+                f"WHERE guild_id = %s "
+                f"AND is_active = 1 "
+                f"AND (expires_at IS NULL OR expires_at > NOW())",
                 (guild_id,)
             )
             return cursor.fetchone()
@@ -681,26 +699,93 @@ class SubscriptionModel:
         return SubscriptionModel.get(guild_id)
 
     @staticmethod
-    def deactivate(guild_id: int) -> bool:
+    def list_expiring_for_reminder(days: int = 5, limit: int = 100) -> List[Dict]:
+        with get_db_context() as conn:
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute(
+                f"""
+                    SELECT s.*, g.name AS guild_name
+                    FROM {DB_TABLE_PREFIX}subscriptions s
+                    LEFT JOIN {DB_TABLE_PREFIX}guilds g ON s.guild_id = g.id
+                    WHERE s.is_active = 1
+                      AND s.reminder_sent = 0
+                      AND s.expires_at IS NOT NULL
+                      AND s.expires_at BETWEEN NOW() AND DATE_ADD(NOW(), INTERVAL %s DAY)
+                    ORDER BY s.expires_at ASC
+                    LIMIT %s
+                """,
+                (int(days), int(limit)),
+            )
+            return cursor.fetchall()
+
+    @staticmethod
+    def list_expired_active(limit: int = 100) -> List[Dict]:
+        with get_db_context() as conn:
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute(
+                f"""
+                    SELECT s.*, g.name AS guild_name
+                    FROM {DB_TABLE_PREFIX}subscriptions s
+                    LEFT JOIN {DB_TABLE_PREFIX}guilds g ON s.guild_id = g.id
+                    WHERE s.is_active = 1
+                      AND s.expires_at IS NOT NULL
+                      AND s.expires_at <= NOW()
+                    ORDER BY s.expires_at ASC
+                    LIMIT %s
+                """,
+                (int(limit),),
+            )
+            return cursor.fetchall()
+
+    @staticmethod
+    def mark_reminder_sent(subscription_id: int) -> bool:
         with get_db_context() as conn:
             cursor = conn.cursor()
             try:
                 cursor.execute(
-                    f"UPDATE {DB_TABLE_PREFIX}subscriptions SET is_active = 0 WHERE guild_id = %s",
-                    (guild_id,)
+                    f"UPDATE {DB_TABLE_PREFIX}subscriptions "
+                    f"SET reminder_sent = 1 WHERE id = %s",
+                    (subscription_id,)
                 )
-                logger.info(f"Abonnement desactive pour guild {guild_id}")
                 return True
             except Exception as e:
-                logger.error(f"Erreur desactivation abonnement: {e}")
+                logger.error(f"Erreur reminder_sent abonnement {subscription_id}: {e}")
                 return False
+
+    @staticmethod
+    def deactivate(guild_id: int) -> bool:
+        with get_db_context() as conn:
+            cursor = conn.cursor()
+            query = (
+                f"UPDATE {DB_TABLE_PREFIX}subscriptions "
+                f"SET is_active = 0, "
+                f"    expires_at = COALESCE(expires_at, NOW()), "
+                f"    reminder_sent = 1 "
+                f"WHERE guild_id = %s"
+            )
+            cursor.execute(
+                query,
+                (guild_id,)
+            )
+        try:
+            GuildModel.update(
+                guild_id,
+                tier="free",
+                ai_moderation=0,
+                staff_suggestions=0,
+            )
+        except Exception:
+            pass
+        logger.info(f"Abonnement desactive pour guild {guild_id}")
+        return True
 
     @staticmethod
     def count_active() -> int:
         with get_db_context() as conn:
             cursor = conn.cursor()
             cursor.execute(
-                f"SELECT COUNT(*) FROM {DB_TABLE_PREFIX}subscriptions WHERE is_active = 1"
+                f"SELECT COUNT(*) FROM {DB_TABLE_PREFIX}subscriptions "
+                f"WHERE is_active = 1 AND (expires_at IS NULL OR expires_at > NOW())"
             )
             return cursor.fetchone()[0]
 

@@ -536,6 +536,26 @@ def _ensure_audit_log_and_notifications_migrations() -> None:
             logger.info(f"[db] Table {notif_table} creee")
 
 
+def _ensure_subscription_migrations() -> None:
+    table = f"{DB_TABLE_PREFIX}subscriptions"
+    if not _table_exists(table):
+        return
+
+    if _column_info(table, "reminder_sent") is None:
+        with get_db_context() as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    f"ALTER TABLE {table} "
+                    f"ADD COLUMN reminder_sent TINYINT(1) DEFAULT 0 "
+                    f"COMMENT '1 = rappel de renouvellement deja envoye'"
+                )
+                logger.info(f"[db] Colonne reminder_sent ajoutee a {table}")
+            except Exception as e:
+                if "duplicate column" not in str(e).lower():
+                    logger.warning(f"[db] ALTER {table}.reminder_sent: {e}")
+
+
 def ensure_database_schema() -> None:
     """
     Creates/migrates the MySQL schema at API startup using the `database/` folder.
@@ -565,6 +585,7 @@ def ensure_database_schema() -> None:
     _ensure_knowledge_base_migrations()
     _ensure_guild_v04_migrations()
     _ensure_audit_log_and_notifications_migrations()
+    _ensure_subscription_migrations()
 
     # 3) Re-apply views (so they can reference the new columns).
     try:

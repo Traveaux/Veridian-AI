@@ -202,6 +202,7 @@ CREATE TABLE IF NOT EXISTS vai_subscriptions (
     started_at  TIMESTAMP       DEFAULT CURRENT_TIMESTAMP,
     expires_at  TIMESTAMP       NULL            COMMENT 'NULL = pas dexpiration fixee',
     is_active   TINYINT(1)      DEFAULT 1,
+    reminder_sent TINYINT(1)    DEFAULT 0       COMMENT '1 = rappel de renouvellement deja envoye',
     payment_id  INT                             COMMENT 'FK vers vai_payments',
     KEY idx_guild   (guild_id),
     KEY idx_active  (is_active),
