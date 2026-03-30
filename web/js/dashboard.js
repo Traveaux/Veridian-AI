@@ -1190,7 +1190,8 @@ async function loadOrders() {
       } else if (plan === "free") {
         noteEl.textContent = "Passez à Premium ou Pro avec les sélecteurs ci-dessous pour débloquer plus de tickets, de langues et d'options.";
       } else {
-        noteEl.textContent = "Votre serveur dispose d'un abonnement actif. Vous pouvez le renouveler ou le faire évoluer directement depuis cette page.";
+        noteEl.textContent =
+          "Votre serveur dispose d'un abonnement actif. Pensez à le repayer avant son expiration pour qu'il reste actif et pour éviter la désactivation des options du plan.";
       }
     }
 
@@ -1299,10 +1300,10 @@ function renderBillingSelection() {
   summaryTitle.textContent = `${planLabel} · ${methodLabel}`;
   summaryDescription.textContent =
     method === "oxapay"
-      ? "Paiement automatique via OxaPay. Une page de paiement sera générée avec la référence de commande."
+      ? "Paiement automatique via OxaPay. Une page de paiement sera générée avec la référence de commande. L'abonnement dure 30 jours et doit être repayé avant expiration pour rester actif."
       : method === "paypal"
-        ? "Une commande manuelle sera créée avec la référence et les instructions PayPal. La référence doit être ajoutée dans la note ou le message vendeur."
-        : "Une commande manuelle sera créée. Vous pourrez transmettre votre code de carte cadeau avec la référence.";
+        ? "Une commande manuelle sera créée avec la référence et les instructions PayPal. La référence doit être ajoutée dans la note ou le message vendeur. L'abonnement doit être repayé avant expiration pour éviter la désactivation des options du plan."
+        : "Une commande manuelle sera créée. Vous pourrez transmettre votre code de carte cadeau avec la référence. L'abonnement doit être repayé avant expiration pour rester actif.";
 }
 
 function hideBillingPurchaseFeedback() {
@@ -1333,6 +1334,7 @@ function renderBillingPurchaseFeedback(data) {
     <div style="font-size:13px;font-weight:700;color:var(--text)">${escHtml(payment.title || "Paiement prêt")}</div>
     <div style="font-size:11.5px;color:var(--text2);line-height:1.65;margin-top:6px">${descriptionHtml}</div>
     <div style="font-size:11px;color:var(--text3);font-family:'Space Mono',monospace;margin-top:10px">Référence: ${escHtml(reference || "—")}</div>
+    <div style="font-size:11px;color:var(--yellow);line-height:1.6;margin-top:8px">Rappel: repayez avant expiration pour garder l'abonnement actif et éviter la désactivation des options du plan.</div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:12px">${actionUrl}</div>
   `;
 }
