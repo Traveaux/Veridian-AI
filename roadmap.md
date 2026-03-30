@@ -1,5 +1,6 @@
 # 🚀 Veridian AI — Roadmap v2.0 Production-Ready & Rentable
 > **Cible :** 1.0-stable rentable · Rédigé : Mars 2026 · Mise à jour complète
+> **Contrainte d'application :** pour les paiements et abonnements, `condition.md` prime sur cette roadmap. Donc pas de Stripe ici, seulement OxaPay, PayPal et carte cadeau, avec renouvellement manuel et rappels d'expiration.
 
 ---
 
