@@ -840,7 +840,10 @@ async def create_dashboard_purchase(guild_id: int, body: PurchaseBody, request: 
                     "Mobile PayPal : Envoyer -> [montant] -> Selectionner contact -> Ajouter une note\n"
                     "Web PayPal : Envoyer de l'argent -> Payer pour des biens/services -> Ajouter un message au vendeur\n\n"
                     "Sans cette reference dans le message PayPal, nous ne pourrons pas associer votre paiement a votre commande.\n"
-                    "Activation sous 24h apres reception et verification."
+                    "Activation sous 24h apres reception et verification.\n\n"
+                    "Une fois valide, l'abonnement reste actif 30 jours.\n"
+                    "Vous devrez repayer avant expiration pour qu'il reste actif et pour eviter "
+                    "la desactivation des options du plan choisi."
                 ),
                 "reference": order_id,
                 "payment_target": paypal_email,
@@ -853,7 +856,9 @@ async def create_dashboard_purchase(guild_id: int, body: PurchaseBody, request: 
                 "title": "Carte cadeau",
                 "description": (
                     "La commande est creee. Ouvrez un ticket ou contactez le support avec le code de la carte "
-                    f"et la reference {order_id} pour validation."
+                    f"et la reference {order_id} pour validation.\n\n"
+                    "Une fois valide, l'abonnement reste actif 30 jours. Vous devrez repayer avant expiration "
+                    "pour le garder actif et pour eviter la desactivation des options du plan."
                 ),
                 "reference": order_id,
                 "action_label": "Ouvrir le dashboard",

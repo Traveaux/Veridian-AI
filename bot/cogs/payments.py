@@ -33,15 +33,19 @@ PAYPAL_INSTRUCTIONS_TEMPLATE = """
 ```
 6. Envoyez le paiement
 
+**ATTENTION :** Sans cette reference dans le message PayPal, nous ne pourrons pas associer votre paiement a votre commande.
+
 Mobile PayPal :
 Envoyer -> [montant] -> Selectionner contact -> Ajouter une note
 
 Web PayPal :
 Envoyer de l'argent -> Payer pour des biens/services -> Ajouter un message au vendeur
 
-Sans cette reference dans le message PayPal, nous ne pourrons pas associer votre paiement a votre commande.
-
 Activation sous 24h apres reception et verification.
+
+Votre abonnement sera actif pendant **30 jours** apres validation.
+Pour qu'il reste actif, vous devrez **repayer avant la date d'expiration**.
+Sans renouvellement, les options du plan choisi pourront etre desactivees.
 """.strip()
 
 
