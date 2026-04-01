@@ -22,10 +22,30 @@ let state = {
   currentGuild: null,
   guildMeta: {}, // { [guildId]: { plan?: string } }
   currentPage: "dashboard",
+  billingCatalog: null,
   billingSelection: {
-    plan: "premium",
+    plan: "starter",
+    interval: "month",
     method: "oxapay",
   },
+};
+
+const FALLBACK_BILLING_CATALOG = {
+  default_plan: "starter",
+  default_interval: "month",
+  default_method: "oxapay",
+  annual_discount_percent: 25,
+  plans: [
+    { id: "free", label: "Free", intervals: { month: 0, year: 0 } },
+    { id: "starter", label: "Starter", intervals: { month: 4, year: 36 } },
+    { id: "pro", label: "Pro", intervals: { month: 12, year: 108 } },
+    { id: "business", label: "Business", intervals: { month: 29, year: 261 } },
+  ],
+  methods: [
+    { id: "oxapay", label: "Crypto" },
+    { id: "paypal", label: "PayPal" },
+    { id: "giftcard", label: "Carte cadeau" },
+  ],
 };
 
 function normalizeSnowflake(raw) {
@@ -33,6 +53,35 @@ function normalizeSnowflake(raw) {
   if (!s) return null;
   const m = s.match(/\d{5,}/);
   return m ? m[0] : null;
+}
+
+function getBillingCatalog() {
+  return state.billingCatalog || FALLBACK_BILLING_CATALOG;
+}
+
+function getBillingPlanMeta(plan) {
+  const normalized = String(plan || "").toLowerCase();
+  return getBillingCatalog().plans.find((item) => item.id === normalized) || getBillingCatalog().plans[0];
+}
+
+function getBillingMethodMeta(method) {
+  const normalized = String(method || "").toLowerCase();
+  return getBillingCatalog().methods.find((item) => item.id === normalized) || getBillingCatalog().methods[0];
+}
+
+function getBillingPrice(plan, interval = "month") {
+  const planMeta = getBillingPlanMeta(plan);
+  return Number((planMeta.intervals || {})[interval] || 0);
+}
+
+function getBillingPriceLabel(plan, interval = "month") {
+  const price = getBillingPrice(plan, interval);
+  if (!price) return "0€/mois";
+  return interval === "year" ? `${price}€/an` : `${price}€/mois`;
+}
+
+function getBillingIntervalLabel(interval = "month") {
+  return interval === "year" ? "Annuel" : "Mensuel";
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -125,7 +174,14 @@ function bindStaticActions() {
 
     const billingPlan = e.target.closest("[data-billing-plan]");
     if (billingPlan) {
-      state.billingSelection.plan = billingPlan.dataset.billingPlan || "premium";
+      state.billingSelection.plan = billingPlan.dataset.billingPlan || "starter";
+      renderBillingSelection();
+      return;
+    }
+
+    const billingInterval = e.target.closest("[data-billing-interval]");
+    if (billingInterval) {
+      state.billingSelection.interval = billingInterval.dataset.billingInterval || "month";
       renderBillingSelection();
       return;
     }
@@ -285,6 +341,19 @@ async function loadGuilds() {
   }
 }
 
+async function loadBillingCatalog() {
+  if (!state.token) return;
+  try {
+    const data = await apiFetch("/internal/billing/catalog", { auth: true });
+    state.billingCatalog = data || FALLBACK_BILLING_CATALOG;
+  } catch (e) {
+    state.billingCatalog = FALLBACK_BILLING_CATALOG;
+    console.warn("Billing catalog:", e.message);
+  }
+  renderBillingCatalog();
+  renderBillingSelection();
+}
+
 async function logout() {
   try {
     await apiPost("/auth/logout", { token: state.token });
@@ -328,6 +397,7 @@ function renderDashboard() {
 
   // Server selector
   populateServerSelector();
+  loadBillingCatalog();
   // Fetch real plan/meta for the selected guild
   if (state.currentGuild?.id) ensureGuildMeta(state.currentGuild.id);
 
@@ -461,10 +531,11 @@ function populateServerSelector() {
 
 function formatPlanLabel(plan) {
   const p = String(plan || "").toLowerCase();
-  if (p === "pro") return "Pro";
-  if (p === "premium") return "Premium";
-  if (p === "free") return "Free";
-  return p ? p.toUpperCase() : "—";
+  if (!p || p === "free") return typeof t === "function" ? t("plan_free") : "Free";
+  if (p === "premium" || p === "starter") return typeof t === "function" ? t("plan_starter") : "Starter";
+  if (p === "pro") return typeof t === "function" ? t("plan_pro") : "Pro";
+  if (p === "business") return typeof t === "function" ? t("plan_business") : "Business";
+  return getBillingPlanMeta(p).label || p.toUpperCase();
 }
 
 function updateServerPlanDisplay() {
@@ -1145,6 +1216,7 @@ async function loadOrders() {
   try {
     const stats = await apiFetch(`/internal/guild/${state.currentGuild.id}/stats`, { auth: true });
     const plan = String(stats.current_plan || "free").toLowerCase();
+    const currentInterval = String(stats.current_interval || "month").toLowerCase();
     const subStatus = String(stats.subscription_status || (plan === "free" ? "free" : "active")).toLowerCase();
     const expiresAt = stats.expires_at || null;
     const expiresSoon = Number(stats.days_until_expiry || 0) > 0 && Number(stats.days_until_expiry || 0) <= 5;
@@ -1158,10 +1230,7 @@ async function loadOrders() {
         : formatPlanLabel(plan);
     }
     if (priceEl) {
-      const basePrice =
-        plan === "premium" ? "2€/mois" :
-        plan === "pro" ? "5€/mois" :
-        "0€/mois";
+      const basePrice = getBillingPriceLabel(plan, currentInterval);
       priceEl.textContent = expiresAt
         ? `— ${basePrice} · Expire le ${formatDateLabel(expiresAt)}`
         : `— ${basePrice}`;
@@ -1169,12 +1238,12 @@ async function loadOrders() {
     if (statusEl) {
       if (subStatus === "expired") {
         statusEl.className = "pill rejected";
-        statusEl.textContent = "Expiré";
+        statusEl.textContent = typeof t === "function" ? t("dash_status_expired") : "Expiré";
       } else if (expiresSoon) {
         statusEl.className = "pill pending";
-        statusEl.textContent = "Expire bientôt";
+        statusEl.textContent = typeof t === "function" ? t("dash_status_expires_soon") : "Expire bientôt";
       } else {
-        statusEl.className = `pill ${plan === "free" ? "free" : plan === "premium" ? "premium" : "pro"}`;
+        statusEl.className = `pill ${plan === "free" ? "free" : plan === "starter" ? "premium" : "pro"}`;
         statusEl.textContent = formatPlanLabel(plan);
       }
     }
@@ -1188,23 +1257,21 @@ async function loadOrders() {
           `Votre abonnement expire${expiresAt ? ` le ${formatDateLabel(expiresAt)}` : " bientôt"}. ` +
           "Repayez avant cette date pour qu'il reste actif et pour éviter la désactivation des options du plan.";
       } else if (plan === "free") {
-        noteEl.textContent = "Passez à Premium ou Pro avec les sélecteurs ci-dessous pour débloquer plus de tickets, de langues et d'options.";
+        noteEl.textContent = "Passez à Starter, Pro ou Business avec les sélecteurs ci-dessous pour débloquer plus de tickets, de langues et d'options.";
       } else {
         noteEl.textContent =
           "Votre serveur dispose d'un abonnement actif. Pensez à le repayer avant son expiration pour qu'il reste actif et pour éviter la désactivation des options du plan.";
       }
     }
 
-    if (plan === "pro") {
-      state.billingSelection.plan = "pro";
-    } else if (state.billingSelection.plan !== "premium") {
-      state.billingSelection.plan = "premium";
-    }
+    if (["starter", "pro", "business"].includes(plan)) state.billingSelection.plan = plan;
+    else if (!["starter", "pro", "business"].includes(state.billingSelection.plan)) state.billingSelection.plan = "starter";
+    state.billingSelection.interval = ["month", "year"].includes(currentInterval) ? currentInterval : "month";
     renderBillingSelection();
   } catch (e) {
     if (statusEl) {
       statusEl.className = "pill rejected";
-      statusEl.textContent = "Indisponible";
+      statusEl.textContent = typeof t === "function" ? t("dash_status_unavailable") : "Indisponible";
     }
     console.warn("Billing:", e.message);
   }
@@ -1249,8 +1316,46 @@ function renderOrders(orders, containerId = "orders-list") {
 }
 
 function initBillingUI() {
+  renderBillingCatalog();
   renderBillingSelection();
   setBillingModalView("plans");
+}
+
+function renderBillingCatalog() {
+  const catalog = getBillingCatalog();
+
+  document.querySelectorAll("[data-billing-plan]").forEach((el) => {
+    const planId = el.dataset.billingPlan;
+    const meta = getBillingPlanMeta(planId);
+    const titleEl = el.querySelector(".billing-choice-title");
+    const priceEl = el.querySelector(".billing-choice-meta");
+    if (titleEl) titleEl.textContent = formatPlanLabel(planId);
+    if (priceEl) priceEl.textContent = getBillingPriceLabel(planId, state.billingSelection.interval);
+  });
+
+  document.querySelectorAll("[data-billing-plan-card]").forEach((el) => {
+    const planId = el.dataset.billingPlanCard;
+    const meta = getBillingPlanMeta(planId);
+    const titleEl = el.querySelector(".billing-plan-name");
+    const priceEl = el.querySelector(".billing-plan-price");
+    if (titleEl) titleEl.textContent = formatPlanLabel(planId);
+    if (priceEl) {
+      const price = getBillingPrice(planId, state.billingSelection.interval);
+      const isYearly = state.billingSelection.interval === "year";
+      const unitKey = isYearly ? "price_per_year" : "price_per_month";
+      const unit = typeof t === "function" ? t(unitKey) : (isYearly ? "/an" : "/mois");
+      priceEl.innerHTML = `${price}€<span>${unit}</span>`;
+    }
+  });
+
+  const discount = Number(catalog.annual_discount_percent || 25);
+  document.querySelectorAll("[data-billing-interval]").forEach((el) => {
+    const interval = el.dataset.billingInterval;
+    const metaEl = el.querySelector(".billing-choice-meta");
+    if (metaEl) {
+      metaEl.textContent = interval === "year" ? `-${discount}%` : "Flexibilité maximale";
+    }
+  });
 }
 
 function openBillingModal(view = "plans") {
@@ -1278,6 +1383,11 @@ function setBillingModalView(view) {
 }
 
 function renderBillingSelection() {
+  renderBillingCatalog();
+
+  document.querySelectorAll("[data-billing-interval]").forEach((el) => {
+    el.classList.toggle("active", el.dataset.billingInterval === state.billingSelection.interval);
+  });
   document.querySelectorAll("[data-billing-plan]").forEach((el) => {
     el.classList.toggle("active", el.dataset.billingPlan === state.billingSelection.plan);
   });
@@ -1291,19 +1401,18 @@ function renderBillingSelection() {
 
   const plan = state.billingSelection.plan;
   const method = state.billingSelection.method;
-  const planLabel = plan === "pro" ? "Pro" : "Premium";
-  const methodLabel =
-    method === "paypal" ? "PayPal" :
-    method === "giftcard" ? (typeof t === "function" ? t("payment_gift") : "Carte cadeau") :
-    "Crypto";
+  const interval = state.billingSelection.interval;
+  const planLabel = getBillingPlanMeta(plan).label;
+  const methodLabel = getBillingMethodMeta(method).label || method;
+  const priceLabel = getBillingPriceLabel(plan, interval);
 
-  summaryTitle.textContent = `${planLabel} · ${methodLabel}`;
+  summaryTitle.textContent = `${planLabel} · ${getBillingIntervalLabel(interval)} · ${methodLabel}`;
   summaryDescription.textContent =
     method === "oxapay"
-      ? "Paiement automatique via OxaPay. Une page de paiement sera générée avec la référence de commande. L'abonnement dure 30 jours et doit être repayé avant expiration pour rester actif."
+      ? `Paiement automatique via OxaPay. Tarif: ${priceLabel}. Une page de paiement sera générée avec la référence de commande.`
       : method === "paypal"
-        ? "Une commande manuelle sera créée avec la référence et les instructions PayPal. La référence doit être ajoutée dans la note ou le message vendeur. L'abonnement doit être repayé avant expiration pour éviter la désactivation des options du plan."
-        : "Une commande manuelle sera créée. Vous pourrez transmettre votre code de carte cadeau avec la référence. L'abonnement doit être repayé avant expiration pour rester actif.";
+        ? `Une commande manuelle sera créée avec la référence et les instructions PayPal. Tarif: ${priceLabel}. La référence doit être ajoutée dans le message vendeur.`
+        : `Une commande manuelle sera créée. Tarif: ${priceLabel}. Vous pourrez transmettre votre code de carte cadeau avec la référence.`;
 }
 
 function hideBillingPurchaseFeedback() {
@@ -1358,6 +1467,7 @@ async function submitBillingPurchase() {
   try {
     const data = await apiPost(`/internal/guild/${state.currentGuild.id}/purchase`, {
       plan: state.billingSelection.plan,
+      interval: state.billingSelection.interval,
       method: state.billingSelection.method,
     });
     renderBillingPurchaseFeedback(data);
@@ -1649,9 +1759,7 @@ async function loadSettings() {
         updateServerPlanDisplay();
         if (planEl) planEl.textContent = formatPlanLabel(plan);
         if (priceEl) {
-          priceEl.textContent =
-            String(plan).toLowerCase() === "premium" ? "— 2€/mois" :
-            String(plan).toLowerCase() === "pro" ? "— 5€/mois" : "";
+          priceEl.textContent = `— ${getBillingPriceLabel(plan, String(stats.current_interval || "month").toLowerCase())}`;
         }
       } catch (_) {
         if (planEl) planEl.textContent = "—";
@@ -1927,7 +2035,7 @@ async function loadSuperAdminData() {
 
 async function adminActivateSub() {
   const guildId = normalizeSnowflake(document.getElementById("admin-guild-id")?.value?.trim());
-  const plan = document.getElementById("admin-plan")?.value || "premium";
+  const plan = document.getElementById("admin-plan")?.value || "starter";
   if (!guildId) return showToast("Guild ID invalide", "warn");
 
   try {

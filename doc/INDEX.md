@@ -18,7 +18,8 @@
 ### Deep Dive
 4. **[STRUCTURE.md](STRUCTURE.md)** - Complete architecture breakdown (17 KB)
 5. **[PROJECT_SUMMARY.txt](PROJECT_SUMMARY.txt)** - Full project status report (14 KB)
-6. **[INDEX.md](INDEX.md)** - This file!
+6. **[REVAMP_EXECUTION_PLAN_2026-03-31.md](REVAMP_EXECUTION_PLAN_2026-03-31.md)** - Pricing revamp, Stripe priority, DB expansion, 6-sprint plan
+7. **[INDEX.md](INDEX.md)** - This file!
 
 ---
 

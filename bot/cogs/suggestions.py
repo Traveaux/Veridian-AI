@@ -9,7 +9,8 @@ from loguru import logger
 from bot.config import COLOR_NOTICE
 from bot.db.models import GuildModel, SubscriptionModel, TicketMessageModel, TicketModel
 from bot.services.groq_client import GroqClient
-from bot.utils.embed_style import style_embed
+from bot.utils.embed_style import style_embed, strip_emojis, _normalize_lang
+from bot.utils.i18n import i18n
 
 
 class SuggestionsCog(commands.Cog):
@@ -56,12 +57,13 @@ class SuggestionsCog(commands.Cog):
             if not suggestion:
                 return
 
+            locale = _normalize_lang(staff_lang, "fr")
             embed = discord.Embed(
-                title="Suggestion de réponse",
-                description=suggestion[:1500],
+                title=i18n.get("suggestions.suggestion_title", locale),
+                description=strip_emojis(suggestion)[:1500],
                 color=discord.Color(COLOR_NOTICE),
             )
-            embed.set_footer(text="IA · Suggestion uniquement")
+            embed.set_footer(text=i18n.get("suggestions.suggestion_footer", locale))
             await message.channel.send(embed=style_embed(embed))
         except Exception as e:
             logger.debug(f"Staff suggestion failed: {e}")

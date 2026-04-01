@@ -42,6 +42,7 @@ from bot.config import VERSION
 # Import routers
 from api.routes.auth import router as auth_router
 from api.routes.internal import router as internal_router   # ← FIX: manquait dans l'original
+from api.routes.webhook import router as webhook_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -181,6 +182,7 @@ app.add_middleware(
 # Include Routers
 app.include_router(auth_router)
 app.include_router(internal_router)
+app.include_router(webhook_router)
 from api.routes.dashboard import router as dashboard_router
 app.include_router(dashboard_router)
 

@@ -10,7 +10,10 @@ import hashlib
 import os
 import json
 from loguru import logger
-from bot.db.models import SubscriptionModel, PaymentModel, OrderModel, PendingNotificationModel, AuditLogModel
+from bot.db.models import (
+    SubscriptionModel, PaymentModel, OrderModel, PendingNotificationModel, AuditLogModel
+)
+from bot.billing import normalize_interval, normalize_plan
 from bot.services.notifications import notify_bot_owner_payment
 
 router = APIRouter(prefix="/webhook", tags=["webhook"])
@@ -82,7 +85,8 @@ async def oxapay_webhook(request: Request):
 
         user_id = payload.get("user_id") or (order or {}).get("user_id")
         guild_id = payload.get("guild_id") or (order or {}).get("guild_id")
-        plan = payload.get("plan") or (order or {}).get("plan")
+        plan = normalize_plan(payload.get("plan") or (order or {}).get("plan"), default="starter")
+        billing_interval = normalize_interval((order or {}).get("billing_interval"), default="month")
 
         if not all([user_id, guild_id, plan]):
             raise HTTPException(status_code=400, detail="Missing order context")
@@ -101,6 +105,7 @@ async def oxapay_webhook(request: Request):
                 amount=amount,
                 currency=currency,
                 plan=plan,
+                billing_interval=billing_interval,
                 order_id=order_id,
                 status="completed",
                 oxapay_invoice_id=invoice_id,
@@ -112,7 +117,7 @@ async def oxapay_webhook(request: Request):
                 user_id=user_id,
                 plan=plan,
                 payment_id=payment_id,
-                duration_days=30
+                billing_interval=billing_interval
             )
             sub = SubscriptionModel.get(guild_id) or {}
             expiry = sub.get("expires_at")

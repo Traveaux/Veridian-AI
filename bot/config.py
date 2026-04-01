@@ -2,6 +2,8 @@
 Constantes globales du projet Veridian AI v0.2
 """
 
+from bot.billing import PLAN_LIMITS, PLAN_TIERS, PRICING
+
 # Version
 VERSION = "1.0.0"
 
@@ -25,39 +27,7 @@ DASHBOARD_URL  = "https://veridiancloud.xyz/dashboard"
 # Database Prefix
 DB_TABLE_PREFIX = "vai_"
 
-# Pricing (en EUR)
-PRICING = {
-    "premium": 2.00,
-    "pro":     5.00
-}
-
-# Plan Tiers
-PLAN_TIERS = ["free", "premium", "pro"]
-
-# Limites par plan
-PLAN_LIMITS = {
-    "free": {
-        "tickets_per_month": 50,
-        "languages":         5,
-        "kb_entries":        10,
-        "features":          ["tickets", "public_support", "knowledge_base"]
-    },
-    "premium": {
-        "tickets_per_month": 500,
-        "languages":         20,
-        "kb_entries":        50,
-        "features":          ["tickets", "public_support", "translations", "transcriptions"]
-    },
-    "pro": {
-        "tickets_per_month": None,   # Illimite
-        "languages":         None,   # Toutes
-        "kb_entries":        None,   # Illimite
-        "features":          [
-            "tickets", "public_support", "translations",
-            "transcriptions", "suggestions", "advanced_stats"
-        ]
-    }
-}
+# Pricing / plan limits centralises dans `bot.billing`.
 
 # Groq Models
 GROQ_MODEL_FAST    = "llama-3.1-8b-instant"

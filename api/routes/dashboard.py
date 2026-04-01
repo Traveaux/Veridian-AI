@@ -16,6 +16,7 @@ from bot.db.models import (
 )
 from bot.db.connection import get_db_context
 from bot.config import PLAN_LIMITS, PRICING, DB_TABLE_PREFIX
+from bot.billing import normalize_interval, normalize_plan
 from api.routes.internal import verify_super_admin
 
 router = APIRouter(prefix="/dashboard", tags=["dashboard"])
@@ -84,7 +85,8 @@ async def validate_order(
             guild_id=order["guild_id"],
             method=order["method"],
             amount=float(order["amount"] or 0),
-            plan=order["plan"],
+            plan=normalize_plan(order["plan"], default="starter"),
+            billing_interval=normalize_interval(order.get("billing_interval"), default="month"),
             order_id=order_id,
             status="completed"
         )
@@ -93,9 +95,9 @@ async def validate_order(
         SubscriptionModel.create(
             guild_id=order["guild_id"],
             user_id=order["user_id"],
-            plan=order["plan"],
+            plan=normalize_plan(order["plan"], default="starter"),
             payment_id=payment_id,
-            duration_days=30
+            billing_interval=normalize_interval(order.get("billing_interval"), default="month")
         )
         sub = SubscriptionModel.get(order["guild_id"]) or {}
         expiry = sub.get("expires_at")
@@ -221,7 +223,8 @@ async def activate_subscription(
             user_id=auth["user_id"], # Link to the admin who activated it
             plan=req.plan,
             payment_id=None,
-            duration_days=req.duration_days
+            duration_days=req.duration_days,
+            billing_interval="month"
         )
         AuditLogModel.log(
             actor_id=auth["user_id"],

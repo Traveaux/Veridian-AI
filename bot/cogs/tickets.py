@@ -16,166 +16,17 @@ from bot.db.connection import get_db_context
 from bot.config import DB_TABLE_PREFIX
 from bot.services.translator import TranslatorService
 from bot.services.groq_client import GroqClient
-from bot.config import TICKET_CHANNEL_PREFIX, BOT_OWNER_DISCORD_ID
-from bot.config import COLOR_SUCCESS, COLOR_NOTICE, COLOR_WARNING, COLOR_CRITICAL
-from bot.utils.embed_style import style_embed, translation_embed_title
+from bot.utils.embed_style import style_embed, translation_embed_title, send_localized_embed, strip_emojis, _normalize_lang
+from bot.utils.i18n import i18n
 
-LANGUAGE_NAMES = {
-    "fr": "Français", "en": "Anglais", "es": "Espagnol", 
-    "de": "Allemand", "it": "Italien", "pt": "Portugais", 
-    "nl": "Néerlandais", "ru": "Russe", "zh": "Chinois", 
-    "ja": "Japonais", "ar": "Arabe", "auto": "Auto"
-}
+# LEGACY DICTS REMOVED - using i18n system instead
 
-def get_lang_name(code: str | None) -> str:
-    if not code or code.lower() == "auto":
-        return code if code else "auto"
-    return LANGUAGE_NAMES.get(code.lower(), code.upper())
+# TICKET_BUTTON_TEXTS removed - using i18n system instead
 
 
-def _safe_int(v):
-    try:
-        if v is None:
-            return None
-        return int(str(v).replace("#", "").replace("@", "").strip())
-    except Exception:
-        return None
-
-
-def _parse_json(raw, default):
-    try:
-        if raw is None:
-            return default
-        if isinstance(raw, (dict, list)):
-            return raw
-        s = str(raw).strip()
-        if not s:
-            return default
-        return json.loads(s)
-    except Exception:
-        return default
-
-
-def _embed_color(raw: str | None) -> discord.Color:
-    n = (raw or "").strip().lower()
-    if not n:
-        return discord.Color(COLOR_SUCCESS)
-
-    hex_raw = n.lstrip("#")
-    if len(hex_raw) in (3, 6) and all(c in "0123456789abcdef" for c in hex_raw):
-        try:
-            if len(hex_raw) == 3:
-                hex_raw = "".join(c * 2 for c in hex_raw)
-            return discord.Color(int(hex_raw, 16))
-        except Exception:
-            pass
-
-    return {
-        "blue": discord.Color(0x4DA6FF),
-        "green": discord.Color(COLOR_SUCCESS),
-        "red": discord.Color(COLOR_CRITICAL),
-        "yellow": discord.Color(COLOR_WARNING),
-        "purple": discord.Color(COLOR_NOTICE),
-        "success": discord.Color(COLOR_SUCCESS),
-        "notice": discord.Color(COLOR_NOTICE),
-        "warning": discord.Color(COLOR_WARNING),
-        "critical": discord.Color(COLOR_CRITICAL),
-    }.get(n, discord.Color(COLOR_SUCCESS))
-
-
-WELCOME_TEXTS = {
-    "en": {
-        "user": "Hello {user_mention}, describe your issue below. We will translate the conversation and get back to you shortly.",
-        "staff": "Staff note: reply in {staff_language}. Current owner: {assigned_staff}.",
-    },
-    "fr": {
-        "user": "Bonjour {user_mention}, décrivez votre problème ci-dessous. Nous traduirons l'échange et le staff reviendra vers vous rapidement.",
-        "staff": "Note staff : répondez en {staff_language}. Ticket actuellement pris par : {assigned_staff}.",
-    },
-    "es": {
-        "user": "Hola {user_mention}, describe tu problema abajo. Traduciremos la conversación y el staff responderá pronto.",
-        "staff": "Nota para el staff: responded en {staff_language}. Ticket asignado a: {assigned_staff}.",
-    },
-    "de": {
-        "user": "Hallo {user_mention}, beschreibe dein Problem unten. Wir übersetzen den Verlauf und das Team antwortet dir bald.",
-        "staff": "Hinweis fürs Team: Antwortet auf {staff_language}. Aktuell zugewiesen an: {assigned_staff}.",
-    },
-    "it": {
-        "user": "Ciao {user_mention}, descrivi il tuo problema qui sotto. Tradurremo la conversazione e lo staff ti risponderà presto.",
-        "staff": "Nota staff: rispondere in {staff_language}. Ticket assegnato a: {assigned_staff}.",
-    },
-    "pt": {
-        "user": "Olá {user_mention}, descreva o seu problema abaixo. Vamos traduzir a conversa e a equipa responderá em breve.",
-        "staff": "Nota da equipa: responder em {staff_language}. Ticket atribuído a: {assigned_staff}.",
-    },
-}
-
-TICKET_BUTTON_TEXTS = {
-    "take": {
-        "en": "Take ticket",
-        "fr": "Prendre le ticket",
-        "es": "Tomar el ticket",
-        "de": "Ticket ubernehmen",
-        "it": "Prendi il ticket",
-        "pt": "Assumir ticket",
-    },
-    "taken_by": {
-        "en": "Taken by {name}",
-        "fr": "Pris par {name}",
-        "es": "Tomado por {name}",
-        "de": "Ubernommen von {name}",
-        "it": "Preso da {name}",
-        "pt": "Assumido por {name}",
-    },
-    "close": {
-        "en": "Close ticket",
-        "fr": "Fermer le ticket",
-        "es": "Cerrar ticket",
-        "de": "Ticket schliessen",
-        "it": "Chiudi ticket",
-        "pt": "Fechar ticket",
-    },
-    "confirm_close": {
-        "en": "Confirm close",
-        "fr": "Confirmer la fermeture",
-        "es": "Confirmar cierre",
-        "de": "Schliessung bestatigen",
-        "it": "Conferma chiusura",
-        "pt": "Confirmar fecho",
-    },
-    "reopen": {
-        "en": "Reopen",
-        "fr": "Reouvrir",
-        "es": "Reabrir",
-        "de": "Wieder offnen",
-        "it": "Riapri",
-        "pt": "Reabrir",
-    },
-    "transcript": {
-        "en": "Transcript",
-        "fr": "Transcript",
-        "es": "Transcripcion",
-        "de": "Transkript",
-        "it": "Trascrizione",
-        "pt": "Transcricao",
-    },
-}
-
-
-def _normalize_lang(code: str | None, fallback: str = "en") -> str:
-    raw = (code or "").strip().lower()
-    if not raw or raw == "auto":
-        return fallback
-    return raw[:2]
-
-
-def _status_label(status: str | None) -> str:
-    return {
-        "open": "Ouvert",
-        "in_progress": "En cours",
-        "pending_close": "En attente de clôture",
-        "closed": "Fermé",
-    }.get((status or "open").strip().lower(), status or "Ouvert")
+def _status_label(status: str | None, locale: str = "fr") -> str:
+    key = f"tickets.status_{status or 'open'}"
+    return i18n.get(key, locale)
 
 
 def _render_template(template: str, variables: dict[str, str]) -> str:
@@ -300,12 +151,11 @@ class TicketsCog(commands.Cog):
                 return
 
             if custom_id.startswith("vai:ticket_open:"):
-                # Cooldown check for button interactions (manual)
-                # 1 ticket every 60s per user
                 bucket = self.open_ticket.get_cooldown_retry_after(interaction)
                 if bucket:
+                    # To be localized later
                     return await interaction.response.send_message(
-                        f"Veuillez patienter {int(bucket)}s avant d'ouvrir un autre ticket.",
+                        f"Wait {int(bucket)}s...",
                         ephemeral=True
                     )
                 return await self.open_ticket(interaction, topic="")
@@ -329,9 +179,7 @@ class TicketsCog(commands.Cog):
             return await asyncio.to_thread(func, *args)
 
     def _default_button_text(self, key: str, language: str, **variables) -> str:
-        lang = _normalize_lang(language, "en")
-        template = TICKET_BUTTON_TEXTS.get(key, {}).get(lang) or TICKET_BUTTON_TEXTS.get(key, {}).get("en") or key
-        return _render_template(template, variables)
+        return i18n.get(f"tickets.button_{key}", language, **variables)
 
     def _translate_button_text(self, text: str, target_language: str, fallback_language: str) -> str:
         raw = (text or "").strip()
@@ -534,9 +382,10 @@ class TicketsCog(commands.Cog):
                 channel = self.bot.get_channel(int(t["channel_id"]))
                 if channel:
                     try:
+                        # Using i18n for auto-close
                         embed = discord.Embed(
-                            title="Ticket fermé automatiquement",
-                            description="Ce ticket a été fermé car il était inactif depuis plus de 3 jours.",
+                            title=i18n.get("tickets.auto_close_title", "fr"),
+                            description=i18n.get("tickets.auto_close_desc", "fr"),
                             color=discord.Color(COLOR_NOTICE)
                         )
                         await channel.send(embed=style_embed(embed))
@@ -601,15 +450,17 @@ class TicketsCog(commands.Cog):
                                    priority: str | None = None,
                                    status: str | None = None,
                                    assigned_staff_name: str | None = None) -> discord.Embed:
-        def fmt_lang(code: str | None, pending_label: str) -> str:
+        def fmt_lang(code: str | None, locale: str) -> str:
             if not code or code == "auto":
-                return pending_label
-            return get_lang_name(code)
+                return i18n.get("support.lang_auto", locale)
+            # Use i18n for language names if we have them, or fallback to code
+            return code.upper()
 
-        ul = fmt_lang(user_language, "English")
-        sl = fmt_lang(staff_language, "English")
-        assigned_label = assigned_staff_name or "Non assigné"
-        status_text = _status_label(status)
+        locale = _normalize_lang(user_language or staff_language, "fr")
+        ul = fmt_lang(user_language, locale)
+        sl = fmt_lang(staff_language, locale)
+        assigned_label = assigned_staff_name or i18n.get("tickets.not_assigned", locale)
+        status_text = _status_label(status, locale)
 
         cfg = guild_config or {}
         variables = {
@@ -634,33 +485,25 @@ class TicketsCog(commands.Cog):
         )
 
         embed = discord.Embed(
-            title="Ticket de Support",
-            color=_embed_color(cfg.get("ticket_welcome_color")),
-            description=(
-                "Le ticket est prêt. Utilisez les boutons ci-dessous pour l'assignation."
-            ),
+            title=i18n.get("tickets.welcome_title", locale),
+            color=i18n.get("tickets.welcome_color", locale, fallback=COLOR_SUCCESS),
+            description=i18n.get("tickets.welcome_desc", locale),
         )
-        embed.add_field(name="Message utilisateur", value=_truncate_block(_render_template(user_template, variables)), inline=False)
-        embed.add_field(name="Note staff", value=_truncate_block(_render_template(staff_template, variables)), inline=False)
-        embed.add_field(name="Ticket ID", value=f"`{ticket_id}`", inline=True)
-        embed.add_field(name="Langue utilisateur", value=f"`{ul}`", inline=True)
-        embed.add_field(name="Langue staff", value=f"`{sl}`", inline=True)
-        embed.add_field(name="Statut", value=f"`{status_text}`", inline=True)
-        embed.add_field(name="Assigné à", value=f"`{assigned_label}`", inline=True)
-        # Priorité du ticket (bas / moyen / haut / prioritaire)
+        embed.add_field(name=i18n.get("tickets.user_msg_field", locale), value=_truncate_block(_render_template(user_template, variables)), inline=False)
+        embed.add_field(name=i18n.get("tickets.staff_note_field", locale), value=_truncate_block(_render_template(staff_template, variables)), inline=False)
+        embed.add_field(name=i18n.get("tickets.ticket_id", locale), value=f"`{ticket_id}`", inline=True)
+        embed.add_field(name=i18n.get("tickets.user_lang", locale), value=f"`{ul}`", inline=True)
+        embed.add_field(name=i18n.get("tickets.staff_lang", locale), value=f"`{sl}`", inline=True)
+        embed.add_field(name=i18n.get("tickets.status", locale), value=f"`{status_text}`", inline=True)
+        embed.add_field(name=i18n.get("tickets.assigned_to", locale), value=f"`{assigned_label}`", inline=True)
+        
         pr_raw = (priority or "medium").strip().lower()
-        pr_label = {
-            "low": "Bas",
-            "medium": "Moyen",
-            "high": "Haut",
-            "urgent": "Prioritaire",
-        }.get(pr_raw, pr_raw or "Moyen")
-        embed.add_field(name="Priorité", value=f"`{pr_label}`", inline=True)
+        pr_label = i18n.get(f"tickets.priority_{pr_raw}", locale)
+        embed.add_field(name=i18n.get("tickets.priority", locale), value=f"`{pr_label}`", inline=True)
 
-        # Smart Analysis (Intent)
         intent = (cfg.get("last_analysis") or "").strip()
         if intent:
-            embed.add_field(name="Analyse IA", value=f"*{intent}*", inline=False)
+            embed.add_field(name=i18n.get("tickets.ai_analysis", locale), value=f"*{intent}*", inline=False)
 
         return embed
 
@@ -744,34 +587,31 @@ class TicketsCog(commands.Cog):
         staff_lang: str | None,
         messages: list[dict],
     ) -> None:
+        locale = _normalize_lang(staff_lang, "fr")
         pr_raw = (ticket.get("priority") or "medium").strip().lower()
-        pr_label = {
-            "low": "Bas",
-            "medium": "Moyen",
-            "high": "Haut",
-            "urgent": "Prioritaire",
-        }.get(pr_raw, pr_raw or "Moyen")
+        pr_label = i18n.get(f"tickets.priority_{pr_raw}", locale)
         metrics = _compute_ticket_metrics(ticket, messages)
-        assigned_label = ticket.get("assigned_staff_name") or "Non assigné"
+        assigned_label = ticket.get("assigned_staff_name") or i18n.get("tickets.not_assigned", locale)
 
         try:
             base_embed = discord.Embed(
-                title="Résumé du ticket (staff)",
-                description=transcript_staff or "Aucun résumé généré.",
+                title=i18n.get("tickets.summary_staff_title", locale),
+                description=transcript_staff or i18n.get("tickets.summary_none", locale),
                 color=discord.Color(COLOR_NOTICE),
             )
-            base_embed.add_field(name="Priorité", value=f"`{pr_label}`", inline=True)
+            base_embed.add_field(name=i18n.get("tickets.priority", locale), value=f"`{pr_label}`", inline=True)
             base_embed.add_field(
                 name="Langues",
-                value=f"User: `{get_lang_name(user_lang or 'en')}` · Staff: `{get_lang_name(staff_lang or 'en')}`",
+                value=f"User: `{user_lang or 'auto'}` · Staff: `{staff_lang or 'auto'}`",
                 inline=True,
             )
-            base_embed.add_field(name="Assigné à", value=f"`{assigned_label}`", inline=True)
+            base_embed.add_field(name=i18n.get("tickets.assigned_to", locale), value=f"`{assigned_label}`", inline=True)
             await channel.send(embed=style_embed(base_embed))
 
             if transcript_user and user_lang and user_lang != staff_lang:
+                u_locale = _normalize_lang(user_lang, locale)
                 user_embed = discord.Embed(
-                    title="Résumé du ticket (client)",
+                    title=i18n.get("tickets.summary_user_title", u_locale),
                     description=transcript_user,
                     color=discord.Color(COLOR_SUCCESS),
                 )
@@ -951,16 +791,17 @@ class TicketsCog(commands.Cog):
                     translated_text, from_cache = await self._run_with_typing(
                         message.channel, self.translator.translate_message_for_staff, message.content, user_lang, staff_lang
                     )
-                    target_language = staff_lang
-
+                    locale = _normalize_lang(staff_lang, "fr")
+                    
                     embed = discord.Embed(
-                        title=translation_embed_title(user_lang),
+                        title=i18n.get("tickets.translation_title", locale, lang=user_lang),
                         description=translated_text[:3900],
                         color=discord.Color(COLOR_NOTICE if from_cache else COLOR_SUCCESS),
                         timestamp=message.created_at
                     )
-                    embed.set_footer(text=message.author.display_name, icon_url=message.author.display_avatar.url)
-                    await message.channel.send(embed=style_embed(embed), reference=message, mention_author=False)
+                    embed.set_footer(text=strip_emojis(message.author.display_name), icon_url=message.author.display_avatar.url)
+                    style_embed(embed)
+                    await message.channel.send(embed=embed, reference=message, mention_author=False)
                     logger.debug(f"Traduction user->staff envoyee pour ticket {ticket['id']}")
                 except Exception as e:
                     logger.error(f"Erreur traduction ticket {ticket['id']}: {e}")
@@ -968,24 +809,15 @@ class TicketsCog(commands.Cog):
             # Ticket-to-Payment: Suggest payment if intent detected
             try:
                 if self.groq_client.detect_payment_intent(text):
-                    payment_embed = discord.Embed(
-                        title="Veridian AI - Plans & Tarifs",
-                        description=(
-                            "Il semble que vous soyez interesse par nos offres !\n\n"
-                            "**Plan Premium (5€/mois)**\n"
-                            "- Support IA illimité\n"
-                            "- Traduction automatique des tickets\n"
-                            "- Résumés de tickets à la clôture\n\n"
-                            "**Plan Pro (15€/mois)**\n"
-                            "- Tout le Premium +\n"
-                            "- Modération IA avancée\n"
-                            "- Suggestions de réponses pour le staff\n\n"
-                            "[Consulter les offres et s'abonner](https://veridiancloud.xyz/dashboard/billing)"
-                        ),
+                    locale = _normalize_lang(user_lang, "fr")
+                    embed = discord.Embed(
+                        title=i18n.get("payments.suggestion_title", locale),
+                        description=i18n.get("payments.suggestion_desc", locale),
                         color=discord.Color(COLOR_WARNING)
                     )
-                    payment_embed.set_footer(text="Paiement sécurisé via Carte ou Crypto (OxaPay)")
-                    await message.channel.send(embed=style_embed(payment_embed))
+                    embed.set_footer(text=i18n.get("payments.suggestion_footer", locale))
+                    style_embed(embed)
+                    await message.channel.send(embed=embed)
                     logger.info(f"Suggestion paiement envoyée pour ticket {ticket['id']}")
             except Exception as e:
                 logger.debug(f"Payment suggestion failed for ticket {ticket['id']}: {e}")
@@ -999,17 +831,18 @@ class TicketsCog(commands.Cog):
                         log_channel = message.guild.get_channel(int(log_channel_id))
                         if log_channel:
                             color = discord.Color(COLOR_CRITICAL) if security_status == "malicious" else discord.Color(COLOR_WARNING)
-                            alert_embed = discord.Embed(
-                                title="Sécurité IA - Ticket",
-                                description=(
-                                    f"Détection **{security_status}** dans un ticket.\n\n"
-                                    f"**Utilisateur:** {message.author.mention} (`{message.author.id}`)\n"
-                                    f"**Ticket:** {message.channel.mention}\n"
-                                    f"**Contenu:** {message.content[:300]}..."
+                            embed = discord.Embed(
+                                title=i18n.get("common.security_alert_title", "fr"),
+                                description=i18n.get("common.security_alert_desc", "fr", 
+                                    status=security_status,
+                                    user=message.author.mention,
+                                    channel=message.channel.mention,
+                                    content=strip_emojis(message.content[:300])
                                 ),
                                 color=color
                             )
-                            await log_channel.send(embed=style_embed(alert_embed))
+                            style_embed(embed)
+                            await log_channel.send(embed=embed)
                             logger.warning(f"Alerte secu ticket ({security_status}) pour {message.author.id}")
             except Exception as e:
                 logger.debug(f"AI Moderation check failed for ticket: {e}")
@@ -1100,16 +933,14 @@ class TicketsCog(commands.Cog):
                 )
                 target_language = user_lang
 
+                locale = _normalize_lang(user_lang, "fr")
                 embed = discord.Embed(
-                    title=translation_embed_title(user_lang),
-                    description=(
-                        f"Traduction · {get_lang_name(staff_src_lang)} vers {get_lang_name(user_lang)} · "
-                        f"{'backend cache' if from_cache else 'api'}\n\n"
-                        f"{translated_text[:3900]}"
-                    ),
+                    title=i18n.get("tickets.translation_title", locale, lang=staff_src_lang),
+                    description=translated_text[:3900],
                     color=discord.Color(COLOR_NOTICE if from_cache else COLOR_SUCCESS),
                 )
-                await message.channel.send(embed=style_embed(embed), reference=message, mention_author=False)
+                style_embed(embed)
+                await message.channel.send(embed=embed, reference=message, mention_author=False)
                 logger.debug(f"Traduction staff->user envoyee pour ticket {ticket['id']}")
             except Exception as e:
                 logger.error(f"Erreur traduction ticket {ticket['id']}: {e}")
@@ -1155,10 +986,10 @@ class TicketsCog(commands.Cog):
 
         guild_config = GuildModel.get(interaction.guild.id)
         if not guild_config:
-            await interaction.followup.send(
-                "Le bot n'est pas encore configure sur ce serveur. "
-                "Demandez a un administrateur de le configurer via le panel : "
-                "https://veridiancloud.xyz/dashboard",
+            await send_localized_embed(
+                interaction,
+                "tickets.config_missing_title",
+                "tickets.config_missing_desc",
                 ephemeral=True
             )
             return
@@ -1175,17 +1006,22 @@ class TicketsCog(commands.Cog):
             except Exception:
                 open_count = 0
             if open_count >= max_open:
-                await interaction.followup.send(
-                    f"Vous avez déjà {open_count} ticket(s) ouvert(s). Limite: {max_open}.",
-                    ephemeral=True,
+                await send_localized_embed(
+                    interaction,
+                    "tickets.limit_reached_title",
+                    "tickets.limit_reached_desc",
+                    open_count=open_count,
+                    max_open=max_open,
+                    ephemeral=True
                 )
                 return
 
         category_id = _safe_int(guild_config.get("ticket_category_id"))
         if not category_id:
-            await interaction.followup.send(
-                "La categorie des tickets n'est pas configuree. "
-                "Configurez-la sur https://veridiancloud.xyz/dashboard",
+            await send_localized_embed(
+                interaction,
+                "tickets.no_category_title",
+                "tickets.no_category_desc",
                 ephemeral=True
             )
             return
@@ -1208,10 +1044,11 @@ class TicketsCog(commands.Cog):
             or not isinstance(category, discord.CategoryChannel)
             or int(getattr(category.guild, "id", 0) or 0) != int(interaction.guild.id)
         ):
-            await interaction.followup.send(
-                "Categorie des tickets introuvable (ID invalide ou pas une categorie). "
-                "Verifiez la configuration sur le panel.",
-                ephemeral=True,
+            await send_localized_embed(
+                interaction,
+                "tickets.invalid_category_title",
+                "tickets.invalid_category_desc",
+                ephemeral=True
             )
             return
 
@@ -1305,8 +1142,12 @@ class TicketsCog(commands.Cog):
         except Exception:
             pass
 
-        await interaction.followup.send(
-            f"Ticket cree : {ticket_channel.mention}", ephemeral=True
+        await send_localized_embed(
+            interaction,
+            "tickets.created_title",
+            "tickets.created_desc",
+            channel=ticket_channel.mention,
+            ephemeral=True
         )
         logger.info(f"Ticket {ticket_id} cree pour {interaction.user.id} sur {interaction.guild.id}")
 
@@ -1346,30 +1187,23 @@ class TicketsCog(commands.Cog):
                 closer=interaction.user,
                 reason=reason,
             )
-            await interaction.followup.send("Ticket fermé. Résumé et transcription envoyés.", ephemeral=True)
+            await send_localized_embed(interaction, "common.success", "tickets.close_success_desc", ephemeral=True)
             logger.info(f"Ticket {ticket['id']} fermé par {interaction.user.id}")
             return
 
         TicketModel.update(ticket["id"], status="pending_close", close_reason=reason)
         await self._try_update_welcome_embed(interaction.channel, ticket["id"])
-        await interaction.followup.send(
-            "Demande de fermeture enregistrée. Un staff/admin doit confirmer.", ephemeral=True
-        )
+        await send_localized_embed(interaction, "common.success", "tickets.close_confirm_desc", ephemeral=True)
 
     async def cog_app_command_error(self, interaction: discord.Interaction, error: discord.app_commands.AppCommandError):
         if isinstance(error, discord.app_commands.CommandOnCooldown):
-            embed = discord.Embed(
-                title="Veuillez patienter",
-                description=(
-                    f"Vous pouvez ouvrir un nouveau ticket dans **{int(error.retry_after)} secondes**.\n"
-                    "Cette limite existe pour éviter les abus."
-                ),
-                color=discord.Color(COLOR_WARNING),
+            await send_localized_embed(
+                interaction, 
+                "tickets.wait_title", 
+                "tickets.wait_desc", 
+                seconds=int(error.retry_after), 
+                ephemeral=True
             )
-            if not interaction.response.is_done():
-                await interaction.response.send_message(embed=style_embed(embed), ephemeral=True)
-            else:
-                await interaction.followup.send(embed=style_embed(embed), ephemeral=True)
         else:
             logger.error(f"Erreur TicketCog command: {error}")
 
@@ -1396,9 +1230,9 @@ class TicketOpenButtonView(discord.ui.View):
         self.add_item(
             discord.ui.Button(
                 custom_id=f"vai:ticket_open:{self.guild_id}",
-                label=(label or "Ouvrir un ticket")[:80],
+                label=strip_emojis(label or "Ouvrir un ticket")[:80],
                 style=btn_style,
-                emoji=(emoji or None),
+                emoji=None,
             )
         )
 
@@ -1410,10 +1244,7 @@ class TicketOpenButtonView(discord.ui.View):
     async def on_error(self, interaction: discord.Interaction, error: Exception, item):
         logger.warning(f"TicketOpenButtonView error: {error}")
         try:
-            if interaction.response.is_done():
-                await interaction.followup.send("Erreur ouverture ticket.", ephemeral=True)
-            else:
-                await interaction.response.send_message("Erreur ouverture ticket.", ephemeral=True)
+            await send_localized_embed(interaction, "common.error", "tickets.error_open", ephemeral=True)
         except Exception:
             pass
 
@@ -1428,10 +1259,10 @@ class TicketOpenSelect(discord.ui.Select):
             try:
                 select_opts.append(
                     discord.SelectOption(
-                        label=str(o.get("label") or "Option")[:100],
+                        label=strip_emojis(str(o.get("label") or "Option"))[:100],
                         value=str(o.get("value") or str(o.get("label") or "option"))[:100],
-                        description=(str(o.get("description") or "")[:100] or None),
-                        emoji=(o.get("emoji") or None),
+                        description=strip_emojis(str(o.get("description") or ""))[:100] or None,
+                        emoji=None,
                     )
                 )
             except Exception:
@@ -1439,7 +1270,7 @@ class TicketOpenSelect(discord.ui.Select):
 
         super().__init__(
             custom_id=f"vai:ticket_open_select:{self.guild_id}",
-            placeholder=(placeholder or "Sélectionnez le type de ticket")[:150],
+            placeholder=strip_emojis(placeholder or "Sélectionnez le type de ticket")[:150],
             min_values=1,
             max_values=1,
             options=select_opts or [discord.SelectOption(label="Support", value="support")],
@@ -1449,7 +1280,7 @@ class TicketOpenSelect(discord.ui.Select):
         topic = (self.values[0] if self.values else "")
         cog = self.bot.get_cog("TicketsCog")
         if not cog:
-            return await interaction.response.send_message("Tickets: cog introuvable.", ephemeral=True)
+            return await send_localized_embed(interaction, "common.error", "tickets.cog_not_found", ephemeral=True)
         return await cog.open_ticket(interaction, topic=topic)
 
 
@@ -1511,11 +1342,11 @@ class TicketControlView(discord.ui.View):
     async def take_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         ticket = TicketModel.get(self.ticket_id)
         if not ticket:
-            await interaction.response.send_message("Ticket introuvable.", ephemeral=True)
+            await send_localized_embed(interaction, "common.error", "tickets.ticket_not_found", ephemeral=True)
             return
 
         if ticket.get("status") == "closed":
-            await interaction.response.send_message("Le ticket est déjà fermé.", ephemeral=True)
+            await send_localized_embed(interaction, "common.error", "tickets.already_closed", ephemeral=True)
             return
 
         is_staff = (
@@ -1524,12 +1355,12 @@ class TicketControlView(discord.ui.View):
             or any(role.permissions.manage_channels for role in interaction.user.roles)
         )
         if not is_staff:
-            await interaction.response.send_message("Permission refusee.", ephemeral=True)
+            await send_localized_embed(interaction, "common.error", "tickets.permission_denied", ephemeral=True)
             return
 
         current_owner_id = int(ticket.get("assigned_staff_id") or 0)
         if current_owner_id and current_owner_id != interaction.user.id and not interaction.user.guild_permissions.administrator:
-            await interaction.response.send_message("Ce ticket est déjà pris en charge par un autre membre du staff.", ephemeral=True)
+            await send_localized_embed(interaction, "common.error", "tickets.ticket_already_taken", ephemeral=True)
             return
 
         new_status = "in_progress"
@@ -1544,19 +1375,19 @@ class TicketControlView(discord.ui.View):
             cog = self.bot.get_cog("TicketsCog")
             if cog:
                 await cog._try_update_welcome_embed(interaction.channel, self.ticket_id)
-            await interaction.response.send_message("Ticket pris en charge.", ephemeral=True)
+            await send_localized_embed(interaction, "common.success", "tickets.ticket_taken_success", ephemeral=True)
         else:
-            await interaction.response.send_message("Ticket mis à jour.", ephemeral=True)
+            await send_localized_embed(interaction, "common.success", "tickets.ticket_updated", ephemeral=True)
 
     @discord.ui.button(label="Fermer le ticket", style=discord.ButtonStyle.secondary, row=0, custom_id="vai:ticket_close")
     async def close_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         ticket = TicketModel.get(self.ticket_id)
         if not ticket:
-            await interaction.response.send_message("Ticket introuvable.", ephemeral=True)
+            await send_localized_embed(interaction, "common.error", "tickets.ticket_not_found", ephemeral=True)
             return
 
         if not isinstance(interaction.channel, discord.TextChannel):
-            await interaction.response.send_message("Canal de ticket invalide.", ephemeral=True)
+            await send_localized_embed(interaction, "common.error", "tickets.invalid_channel", ephemeral=True)
             return
 
         is_user = interaction.user.id == ticket["user_id"]
@@ -1566,26 +1397,24 @@ class TicketControlView(discord.ui.View):
             or int(ticket.get("assigned_staff_id") or 0) == interaction.user.id
         )
         if not (is_user or is_staff):
-            await interaction.response.send_message("Permission refusee.", ephemeral=True)
+            await send_localized_embed(interaction, "common.error", "tickets.permission_denied", ephemeral=True)
             return
 
         current_status = (ticket.get("status") or "open").strip().lower()
         cog = self.bot.get_cog("TicketsCog")
         if not cog:
-            await interaction.response.send_message("Cog tickets introuvable.", ephemeral=True)
+            await send_localized_embed(interaction, "common.error", "tickets.cog_not_found", ephemeral=True)
             return
 
         if current_status != "pending_close":
             TicketModel.update(self.ticket_id, status="pending_close", close_reason="Demande de fermeture via bouton")
             self._refresh_buttons()
             await cog._try_update_welcome_embed(interaction.channel, self.ticket_id)
-            await interaction.response.send_message(
-                "Demande de fermeture enregistrée. Un staff/admin doit confirmer.", ephemeral=True
-            )
+            await send_localized_embed(interaction, "common.success", "tickets.close_confirm_desc", ephemeral=True)
             return
 
         if not is_staff:
-            await interaction.response.send_message("Seul le staff/admin peut confirmer la fermeture.", ephemeral=True)
+            await send_localized_embed(interaction, "common.error", "tickets.only_staff_confirm", ephemeral=True)
             return
 
         await interaction.response.defer(ephemeral=True)
@@ -1596,14 +1425,14 @@ class TicketControlView(discord.ui.View):
             reason="Fermeture confirmée via bouton",
         )
         self._refresh_buttons()
-        await interaction.followup.send("Ticket fermé. Transcription envoyée.", ephemeral=True)
+        await send_localized_embed(interaction, "common.success", "tickets.close_success_desc", ephemeral=True)
         logger.info(f"Ticket {self.ticket_id} ferme via bouton par {interaction.user.id}")
 
     @discord.ui.button(label="Réouvrir", style=discord.ButtonStyle.success, row=1, custom_id="vai:ticket_reopen")
     async def reopen_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         ticket = TicketModel.get(self.ticket_id)
         if not ticket:
-            await interaction.response.send_message("Ticket introuvable.", ephemeral=True)
+            await send_localized_embed(interaction, "common.error", "tickets.ticket_not_found", ephemeral=True)
             return
 
         is_staff = (
@@ -1612,7 +1441,7 @@ class TicketControlView(discord.ui.View):
             or int(ticket.get("assigned_staff_id") or 0) == interaction.user.id
         )
         if not is_staff:
-            await interaction.response.send_message("Seul le staff/admin peut réouvrir le ticket.", ephemeral=True)
+            await send_localized_embed(interaction, "common.error", "tickets.only_staff_confirm", ephemeral=True)
             return
 
         restored_status = "in_progress" if ticket.get("assigned_staff_id") else "open"
@@ -1628,13 +1457,13 @@ class TicketControlView(discord.ui.View):
             cog = self.bot.get_cog("TicketsCog")
             if cog:
                 await cog._try_update_welcome_embed(interaction.channel, self.ticket_id)
-        await interaction.response.send_message("Ticket réouvert.", ephemeral=True)
+        await send_localized_embed(interaction, "common.success", "tickets.reopen_success", ephemeral=True)
 
     @discord.ui.button(label="Transcript", style=discord.ButtonStyle.primary, row=1, custom_id="vai:ticket_transcript")
     async def transcript_button(self, interaction: discord.Interaction, button: discord.ui.Button):
         ticket = TicketModel.get(self.ticket_id)
         if not ticket or not (ticket.get("transcript") or "").strip():
-            await interaction.response.send_message("Aucune transcription disponible pour le moment.", ephemeral=True)
+            await send_localized_embed(interaction, "common.error", "tickets.no_transcript", ephemeral=True)
             return
 
         cog = self.bot.get_cog("TicketsCog")
@@ -1650,12 +1479,16 @@ class TicketControlView(discord.ui.View):
                 display_language=display_lang,
                 audience="user" if interaction.user.id == int(ticket.get("user_id") or 0) else "staff",
             )
+        locale = _normalize_lang(ticket.get("staff_language"), "fr")
         embed = discord.Embed(
-            title=f"Transcript · Ticket #{self.ticket_id}",
+            title=i18n.get("tickets.transcript_title", locale, id=self.ticket_id),
             description=(ticket.get("transcript") or "")[:4000],
             color=discord.Color(COLOR_NOTICE),
         )
-        await interaction.response.send_message(embed=style_embed(embed), ephemeral=True, file=file)
+        if not interaction.response.is_done():
+            await interaction.response.send_message(embed=style_embed(embed), ephemeral=True, file=file)
+        else:
+            await interaction.followup.send(embed=style_embed(embed), ephemeral=True, file=file)
 
 
 async def setup(bot):

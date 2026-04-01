@@ -5,6 +5,7 @@ Modeles et fonctions CRUD pour toutes les tables Veridian AI v0.2
 from datetime import datetime, timedelta
 from bot.db.connection import get_db_context
 from bot.config import DB_TABLE_PREFIX
+from bot.billing import get_default_duration_days, normalize_interval, normalize_plan
 from loguru import logger
 from typing import Optional, List, Dict, Any
 
@@ -473,18 +474,36 @@ class OrderModel:
     @staticmethod
     def create(order_id: str, user_id: int, guild_id: int, method: str,
                plan: str, amount: float, user_username: str = None,
+               billing_interval: str = "month",
                guild_name: str = None) -> bool:
         with get_db_context() as conn:
             cursor = conn.cursor()
+            normalized_plan = normalize_plan(plan, default="starter")
+            normalized_interval = normalize_interval(billing_interval)
             try:
-                query = f"""
-                    INSERT INTO {DB_TABLE_PREFIX}orders
-                    (order_id, user_id, user_username, guild_id, guild_name,
-                     method, plan, amount, status)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'pending')
-                """
-                cursor.execute(query, (order_id, user_id, user_username,
-                                       guild_id, guild_name, method, plan, amount))
+                try:
+                    query = f"""
+                        INSERT INTO {DB_TABLE_PREFIX}orders
+                        (order_id, user_id, user_username, guild_id, guild_name,
+                         method, plan, billing_interval, amount, status)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, 'pending')
+                    """
+                    cursor.execute(query, (order_id, user_id, user_username,
+                                           guild_id, guild_name, method, normalized_plan,
+                                           normalized_interval, amount))
+                except Exception as e:
+                    msg = str(e).lower()
+                    if "unknown column" in msg and "billing_interval" in msg:
+                        query = f"""
+                            INSERT INTO {DB_TABLE_PREFIX}orders
+                            (order_id, user_id, user_username, guild_id, guild_name,
+                             method, plan, amount, status)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'pending')
+                        """
+                        cursor.execute(query, (order_id, user_id, user_username,
+                                               guild_id, guild_name, method, normalized_plan, amount))
+                    else:
+                        raise
                 logger.info(f"Commande {order_id} creee")
                 return True
             except Exception as e:
@@ -590,19 +609,37 @@ class PaymentModel:
     @staticmethod
     def create(user_id: int, guild_id: int, method: str, amount: float,
                currency: str = 'EUR', plan: str = None,
+               billing_interval: str = "month",
                order_id: str = None, status: str = 'completed',
                oxapay_invoice_id: str = None) -> Optional[int]:
         with get_db_context() as conn:
             cursor = conn.cursor()
+            normalized_plan = normalize_plan(plan, default="starter")
+            normalized_interval = normalize_interval(billing_interval)
             try:
-                query = f"""
-                    INSERT INTO {DB_TABLE_PREFIX}payments
-                    (user_id, guild_id, order_id, method, amount, currency,
-                     plan, status, oxapay_invoice_id)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                """
-                cursor.execute(query, (user_id, guild_id, order_id, method,
-                                       amount, currency, plan, status, oxapay_invoice_id))
+                try:
+                    query = f"""
+                        INSERT INTO {DB_TABLE_PREFIX}payments
+                        (user_id, guild_id, order_id, method, amount, currency,
+                         plan, billing_interval, status, oxapay_invoice_id)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    """
+                    cursor.execute(query, (user_id, guild_id, order_id, method,
+                                           amount, currency, normalized_plan,
+                                           normalized_interval, status, oxapay_invoice_id))
+                except Exception as e:
+                    msg = str(e).lower()
+                    if "unknown column" in msg and "billing_interval" in msg:
+                        query = f"""
+                            INSERT INTO {DB_TABLE_PREFIX}payments
+                            (user_id, guild_id, order_id, method, amount, currency,
+                             plan, status, oxapay_invoice_id)
+                            VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        """
+                        cursor.execute(query, (user_id, guild_id, order_id, method,
+                                               amount, currency, normalized_plan, status, oxapay_invoice_id))
+                    else:
+                        raise
                 payment_id = cursor.lastrowid
                 logger.info(f"Paiement {payment_id} cree - {method} {amount}{currency}")
                 return payment_id
@@ -639,32 +676,58 @@ class SubscriptionModel:
 
     @staticmethod
     def create(guild_id: int, user_id: int, plan: str,
-               payment_id: int = None, duration_days: int = 30) -> bool:
+               payment_id: int = None, duration_days: int | None = None,
+               billing_interval: str = "month", expires_at=None) -> bool:
         with get_db_context() as conn:
             cursor = conn.cursor()
+            normalized_plan = normalize_plan(plan, default="starter")
+            normalized_interval = normalize_interval(billing_interval)
             try:
-                expires_at = None
-                if duration_days:
-                    expires_at = datetime.now() + timedelta(days=duration_days)
+                expiry_value = expires_at
+                if expiry_value is None:
+                    if duration_days is None:
+                        duration_days = get_default_duration_days(normalized_interval)
+                    if duration_days:
+                        expiry_value = datetime.now() + timedelta(days=duration_days)
 
-                query = f"""
-                    INSERT INTO {DB_TABLE_PREFIX}subscriptions
-                    (guild_id, user_id, plan, started_at, expires_at, is_active, reminder_sent, payment_id)
-                    VALUES (%s, %s, %s, NOW(), %s, 1, 0, %s)
-                    ON DUPLICATE KEY UPDATE
-                        plan = VALUES(plan),
-                        started_at = NOW(),
-                        expires_at = VALUES(expires_at),
-                        is_active = 1,
-                        reminder_sent = 0,
-                        payment_id = VALUES(payment_id)
-                """
-                cursor.execute(query, (guild_id, user_id, plan, expires_at, payment_id))
                 try:
-                    GuildModel.update(guild_id, tier=plan)
+                    query = f"""
+                        INSERT INTO {DB_TABLE_PREFIX}subscriptions
+                        (guild_id, user_id, plan, billing_interval, started_at, expires_at, is_active, reminder_sent, payment_id)
+                        VALUES (%s, %s, %s, %s, NOW(), %s, 1, 0, %s)
+                        ON DUPLICATE KEY UPDATE
+                            plan = VALUES(plan),
+                            billing_interval = VALUES(billing_interval),
+                            started_at = NOW(),
+                            expires_at = VALUES(expires_at),
+                            is_active = 1,
+                            reminder_sent = 0,
+                            payment_id = VALUES(payment_id)
+                    """
+                    cursor.execute(query, (guild_id, user_id, normalized_plan, normalized_interval, expiry_value, payment_id))
+                except Exception as e:
+                    msg = str(e).lower()
+                    if "unknown column" in msg and "billing_interval" in msg:
+                        query = f"""
+                            INSERT INTO {DB_TABLE_PREFIX}subscriptions
+                            (guild_id, user_id, plan, started_at, expires_at, is_active, reminder_sent, payment_id)
+                            VALUES (%s, %s, %s, NOW(), %s, 1, 0, %s)
+                            ON DUPLICATE KEY UPDATE
+                                plan = VALUES(plan),
+                                started_at = NOW(),
+                                expires_at = VALUES(expires_at),
+                                is_active = 1,
+                                reminder_sent = 0,
+                                payment_id = VALUES(payment_id)
+                        """
+                        cursor.execute(query, (guild_id, user_id, normalized_plan, expiry_value, payment_id))
+                    else:
+                        raise
+                try:
+                    GuildModel.update(guild_id, tier=normalized_plan)
                 except Exception:
                     pass
-                logger.info(f"Abonnement {plan} cree/mis a jour pour guild {guild_id}")
+                logger.info(f"Abonnement {normalized_plan} cree/mis a jour pour guild {guild_id}")
                 return True
             except Exception as e:
                 logger.error(f"Erreur creation abonnement: {e}")
@@ -1445,6 +1508,217 @@ class PendingNotificationModel:
                 cursor.execute(f"DELETE FROM {DB_TABLE_PREFIX}pending_notifications WHERE id = %s", (notif_id,))
                 return True
             except Exception:
+                return False
+
+
+# ============================================================================
+# BILLING VNEXT
+# ============================================================================
+
+class BillingCustomerModel:
+
+    @staticmethod
+    def upsert(provider: str, guild_id: int, provider_customer_id: str,
+               user_id: int | None = None, email: str | None = None) -> bool:
+        with get_db_context() as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    f"""
+                    INSERT INTO {DB_TABLE_PREFIX}billing_customers
+                    (guild_id, user_id, provider, provider_customer_id, email)
+                    VALUES (%s, %s, %s, %s, %s)
+                    ON DUPLICATE KEY UPDATE
+                        user_id = VALUES(user_id),
+                        provider_customer_id = VALUES(provider_customer_id),
+                        email = VALUES(email)
+                    """,
+                    (guild_id, user_id, provider, provider_customer_id, email),
+                )
+                return True
+            except Exception as e:
+                logger.error(f"Erreur upsert billing customer: {e}")
+                return False
+
+    @staticmethod
+    def get_by_guild(provider: str, guild_id: int) -> Optional[Dict]:
+        with get_db_context() as conn:
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute(
+                f"SELECT * FROM {DB_TABLE_PREFIX}billing_customers "
+                f"WHERE provider = %s AND guild_id = %s LIMIT 1",
+                (provider, guild_id),
+            )
+            return cursor.fetchone()
+
+    @staticmethod
+    def get_by_customer_id(provider: str, provider_customer_id: str) -> Optional[Dict]:
+        with get_db_context() as conn:
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute(
+                f"SELECT * FROM {DB_TABLE_PREFIX}billing_customers "
+                f"WHERE provider = %s AND provider_customer_id = %s LIMIT 1",
+                (provider, provider_customer_id),
+            )
+            return cursor.fetchone()
+
+
+class BillingProviderSubscriptionModel:
+
+    @staticmethod
+    def upsert(provider: str, provider_subscription_id: str, guild_id: int,
+               user_id: int | None, provider_customer_id: str | None,
+               plan_code: str, billing_interval: str = "month",
+               status: str = "active", current_period_start=None,
+               current_period_end=None, cancel_at_period_end: bool = False,
+               metadata_json: str | None = None) -> bool:
+        with get_db_context() as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    f"""
+                    INSERT INTO {DB_TABLE_PREFIX}billing_subscriptions
+                    (guild_id, user_id, provider, provider_customer_id, provider_subscription_id,
+                     plan_code, billing_interval, status, cancel_at_period_end,
+                     current_period_start, current_period_end, metadata_json)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ON DUPLICATE KEY UPDATE
+                        guild_id = VALUES(guild_id),
+                        user_id = VALUES(user_id),
+                        provider_customer_id = VALUES(provider_customer_id),
+                        plan_code = VALUES(plan_code),
+                        billing_interval = VALUES(billing_interval),
+                        status = VALUES(status),
+                        cancel_at_period_end = VALUES(cancel_at_period_end),
+                        current_period_start = VALUES(current_period_start),
+                        current_period_end = VALUES(current_period_end),
+                        metadata_json = VALUES(metadata_json)
+                    """,
+                    (
+                        guild_id, user_id, provider, provider_customer_id, provider_subscription_id,
+                        plan_code, billing_interval, status, int(bool(cancel_at_period_end)),
+                        current_period_start, current_period_end, metadata_json,
+                    ),
+                )
+                return True
+            except Exception as e:
+                logger.error(f"Erreur upsert billing subscription: {e}")
+                return False
+
+    @staticmethod
+    def get_by_provider_subscription(provider: str, provider_subscription_id: str) -> Optional[Dict]:
+        with get_db_context() as conn:
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute(
+                f"SELECT * FROM {DB_TABLE_PREFIX}billing_subscriptions "
+                f"WHERE provider = %s AND provider_subscription_id = %s LIMIT 1",
+                (provider, provider_subscription_id),
+            )
+            return cursor.fetchone()
+
+
+class BillingInvoiceModel:
+
+    @staticmethod
+    def upsert(provider: str, provider_invoice_id: str, *,
+               guild_id: int | None = None, user_id: int | None = None,
+               provider_customer_id: str | None = None,
+               provider_subscription_id: str | None = None,
+               currency: str = "EUR", amount_due: float = 0,
+               amount_paid: float = 0, status: str = "paid",
+               hosted_invoice_url: str | None = None, invoice_pdf_url: str | None = None,
+               metadata_json: str | None = None) -> bool:
+        with get_db_context() as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    f"""
+                    INSERT INTO {DB_TABLE_PREFIX}billing_invoices
+                    (guild_id, user_id, provider, provider_invoice_id, provider_customer_id,
+                     provider_subscription_id, currency, amount_due, amount_paid, status,
+                     hosted_invoice_url, invoice_pdf_url, metadata_json)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    ON DUPLICATE KEY UPDATE
+                        guild_id = VALUES(guild_id),
+                        user_id = VALUES(user_id),
+                        provider_customer_id = VALUES(provider_customer_id),
+                        provider_subscription_id = VALUES(provider_subscription_id),
+                        currency = VALUES(currency),
+                        amount_due = VALUES(amount_due),
+                        amount_paid = VALUES(amount_paid),
+                        status = VALUES(status),
+                        hosted_invoice_url = VALUES(hosted_invoice_url),
+                        invoice_pdf_url = VALUES(invoice_pdf_url),
+                        metadata_json = VALUES(metadata_json)
+                    """,
+                    (
+                        guild_id, user_id, provider, provider_invoice_id, provider_customer_id,
+                        provider_subscription_id, currency, amount_due, amount_paid, status,
+                        hosted_invoice_url, invoice_pdf_url, metadata_json,
+                    ),
+                )
+                return True
+            except Exception as e:
+                logger.error(f"Erreur upsert billing invoice: {e}")
+                return False
+
+
+class BillingWebhookEventModel:
+
+    @staticmethod
+    def create(provider: str, event_id: str, event_type: str, payload_json: str) -> bool:
+        with get_db_context() as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    f"""
+                    INSERT INTO {DB_TABLE_PREFIX}billing_webhook_events
+                    (provider, event_id, event_type, payload_json, status)
+                    VALUES (%s, %s, %s, %s, 'received')
+                    """,
+                    (provider, event_id, event_type, payload_json),
+                )
+                return True
+            except Exception as e:
+                if "duplicate" in str(e).lower():
+                    return False
+                logger.error(f"Erreur create billing webhook event: {e}")
+                return False
+
+    @staticmethod
+    def mark_processed(provider: str, event_id: str) -> bool:
+        with get_db_context() as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    f"""
+                    UPDATE {DB_TABLE_PREFIX}billing_webhook_events
+                    SET status = 'processed', processed_at = NOW(), error_message = NULL
+                    WHERE provider = %s AND event_id = %s
+                    """,
+                    (provider, event_id),
+                )
+                return True
+            except Exception as e:
+                logger.error(f"Erreur mark processed webhook event: {e}")
+                return False
+
+    @staticmethod
+    def mark_failed(provider: str, event_id: str, error_message: str) -> bool:
+        with get_db_context() as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    f"""
+                    UPDATE {DB_TABLE_PREFIX}billing_webhook_events
+                    SET status = 'failed', error_message = %s
+                    WHERE provider = %s AND event_id = %s
+                    """,
+                    (str(error_message)[:1900], provider, event_id),
+                )
+                return True
+            except Exception as e:
+                logger.error(f"Erreur mark failed webhook event: {e}")
                 return False
 
     @staticmethod

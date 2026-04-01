@@ -12,7 +12,7 @@
 CREATE TABLE IF NOT EXISTS vai_guilds (
     id                  BIGINT PRIMARY KEY          COMMENT 'Discord Guild ID',
     name                VARCHAR(100)    NOT NULL,
-    tier                ENUM('free','premium','pro') DEFAULT 'free',
+    tier                VARCHAR(32)     DEFAULT 'free',
     support_channel_id  BIGINT                      COMMENT 'Channel support public IA',
     ticket_category_id  BIGINT                      COMMENT 'Categorie tickets',
     staff_role_id       BIGINT,
@@ -152,8 +152,9 @@ CREATE TABLE IF NOT EXISTS vai_orders (
     user_username       VARCHAR(100),
     guild_id            BIGINT,
     guild_name          VARCHAR(100),
-    method              ENUM('paypal','giftcard','oxapay'),
-    plan                ENUM('premium','pro'),
+    method              VARCHAR(32),
+    plan                VARCHAR(32),
+    billing_interval    VARCHAR(16)     DEFAULT 'month' COMMENT 'month/year',
     amount              DECIMAL(10,2),
     status              ENUM('pending','paid','partial','rejected') DEFAULT 'pending',
     paypal_email        VARCHAR(200)                COMMENT 'Email utilise pour PayPal',
@@ -178,10 +179,11 @@ CREATE TABLE IF NOT EXISTS vai_payments (
     user_id             BIGINT,
     guild_id            BIGINT,
     order_id            VARCHAR(20)                 COMMENT 'Reference vai_orders si manuel',
-    method              ENUM('oxapay','paypal','giftcard'),
+    method              VARCHAR(32),
     amount              DECIMAL(10,2),
     currency            VARCHAR(10)     DEFAULT 'EUR',
-    plan                ENUM('premium','pro'),
+    plan                VARCHAR(32),
+    billing_interval    VARCHAR(16)     DEFAULT 'month' COMMENT 'month/year',
     status              ENUM('completed','failed','refunded'),
     oxapay_invoice_id   VARCHAR(100)                COMMENT 'ID invoice OxaPay si crypto',
     paid_at             TIMESTAMP       DEFAULT CURRENT_TIMESTAMP,
@@ -198,7 +200,8 @@ CREATE TABLE IF NOT EXISTS vai_subscriptions (
     id          INT AUTO_INCREMENT PRIMARY KEY,
     guild_id    BIGINT          UNIQUE,
     user_id     BIGINT                          COMMENT 'Qui a paye',
-    plan        ENUM('premium','pro'),
+    plan        VARCHAR(32),
+    billing_interval VARCHAR(16) DEFAULT 'month' COMMENT 'month/year',
     started_at  TIMESTAMP       DEFAULT CURRENT_TIMESTAMP,
     expires_at  TIMESTAMP       NULL            COMMENT 'NULL = pas dexpiration fixee',
     is_active   TINYINT(1)      DEFAULT 1,
@@ -207,6 +210,126 @@ CREATE TABLE IF NOT EXISTS vai_subscriptions (
     KEY idx_guild   (guild_id),
     KEY idx_active  (is_active),
     KEY idx_expires (expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
+-- BILLING VNEXT - Catalogue, clients, abonnements provider et webhooks
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS vai_billing_products (
+    id                  INT AUTO_INCREMENT PRIMARY KEY,
+    code                VARCHAR(64)     NOT NULL UNIQUE,
+    kind                VARCHAR(32)     NOT NULL DEFAULT 'plan' COMMENT 'plan/addon',
+    name                VARCHAR(100)    NOT NULL,
+    is_active           TINYINT(1)      DEFAULT 1,
+    metadata_json       JSON                        COMMENT 'Features, badges, marketing copy',
+    created_at          TIMESTAMP       DEFAULT CURRENT_TIMESTAMP,
+    updated_at          TIMESTAMP       DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    KEY idx_kind        (kind),
+    KEY idx_active      (is_active)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS vai_billing_prices (
+    id                  INT AUTO_INCREMENT PRIMARY KEY,
+    product_code        VARCHAR(64)     NOT NULL,
+    provider            VARCHAR(32)     NOT NULL DEFAULT 'manual',
+    currency            VARCHAR(10)     NOT NULL DEFAULT 'EUR',
+    billing_interval    VARCHAR(16)     NOT NULL DEFAULT 'month',
+    amount              DECIMAL(10,2)   NOT NULL,
+    provider_price_id   VARCHAR(128)                COMMENT 'Identifiant prix externe si necessaire',
+    is_active           TINYINT(1)      DEFAULT 1,
+    created_at          TIMESTAMP       DEFAULT CURRENT_TIMESTAMP,
+    updated_at          TIMESTAMP       DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_product_provider_interval (product_code, provider, currency, billing_interval),
+    KEY idx_provider    (provider),
+    KEY idx_active      (is_active)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS vai_billing_customers (
+    id                  INT AUTO_INCREMENT PRIMARY KEY,
+    guild_id            BIGINT          NOT NULL,
+    user_id             BIGINT,
+    provider            VARCHAR(32)     NOT NULL DEFAULT 'manual',
+    provider_customer_id VARCHAR(128)   NOT NULL,
+    email               VARCHAR(255),
+    created_at          TIMESTAMP       DEFAULT CURRENT_TIMESTAMP,
+    updated_at          TIMESTAMP       DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_provider_customer (provider, provider_customer_id),
+    UNIQUE KEY uniq_provider_guild (provider, guild_id),
+    KEY idx_user        (user_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS vai_billing_subscriptions (
+    id                  INT AUTO_INCREMENT PRIMARY KEY,
+    guild_id            BIGINT          NOT NULL,
+    user_id             BIGINT,
+    provider            VARCHAR(32)     NOT NULL DEFAULT 'manual',
+    provider_customer_id VARCHAR(128),
+    provider_subscription_id VARCHAR(128) NOT NULL,
+    plan_code           VARCHAR(64)     NOT NULL,
+    billing_interval    VARCHAR(16)     NOT NULL DEFAULT 'month',
+    status              VARCHAR(32)     NOT NULL DEFAULT 'incomplete',
+    cancel_at_period_end TINYINT(1)     DEFAULT 0,
+    current_period_start TIMESTAMP      NULL,
+    current_period_end  TIMESTAMP       NULL,
+    metadata_json       JSON,
+    created_at          TIMESTAMP       DEFAULT CURRENT_TIMESTAMP,
+    updated_at          TIMESTAMP       DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_provider_subscription (provider, provider_subscription_id),
+    KEY idx_guild       (guild_id),
+    KEY idx_status      (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS vai_billing_subscription_items (
+    id                  INT AUTO_INCREMENT PRIMARY KEY,
+    billing_subscription_id INT        NOT NULL,
+    provider_item_id    VARCHAR(128),
+    product_code        VARCHAR(64)     NOT NULL,
+    quantity            INT             DEFAULT 1,
+    amount              DECIMAL(10,2)   DEFAULT 0,
+    metadata_json       JSON,
+    created_at          TIMESTAMP       DEFAULT CURRENT_TIMESTAMP,
+    updated_at          TIMESTAMP       DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    KEY idx_subscription (billing_subscription_id),
+    KEY idx_product     (product_code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS vai_billing_invoices (
+    id                  INT AUTO_INCREMENT PRIMARY KEY,
+    guild_id            BIGINT,
+    user_id             BIGINT,
+    provider            VARCHAR(32)     NOT NULL DEFAULT 'manual',
+    provider_invoice_id VARCHAR(128)    NOT NULL,
+    provider_customer_id VARCHAR(128),
+    provider_subscription_id VARCHAR(128),
+    currency            VARCHAR(10)     DEFAULT 'EUR',
+    amount_due          DECIMAL(10,2)   DEFAULT 0,
+    amount_paid         DECIMAL(10,2)   DEFAULT 0,
+    status              VARCHAR(32)     DEFAULT 'draft',
+    hosted_invoice_url  TEXT,
+    invoice_pdf_url     TEXT,
+    metadata_json       JSON,
+    created_at          TIMESTAMP       DEFAULT CURRENT_TIMESTAMP,
+    updated_at          TIMESTAMP       DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_provider_invoice (provider, provider_invoice_id),
+    KEY idx_guild       (guild_id),
+    KEY idx_status      (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS vai_billing_webhook_events (
+    id                  INT AUTO_INCREMENT PRIMARY KEY,
+    provider            VARCHAR(32)     NOT NULL,
+    event_id            VARCHAR(128)    NOT NULL,
+    event_type          VARCHAR(100)    NOT NULL,
+    status              VARCHAR(32)     NOT NULL DEFAULT 'received',
+    payload_json        LONGTEXT,
+    error_message       TEXT,
+    processed_at        TIMESTAMP       NULL,
+    created_at          TIMESTAMP       DEFAULT CURRENT_TIMESTAMP,
+    updated_at          TIMESTAMP       DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_provider_event (provider, event_id),
+    KEY idx_event_type  (event_type),
+    KEY idx_status      (status)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================================

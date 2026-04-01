@@ -14,39 +14,12 @@ import os
 from bot.db.models import OrderModel, SubscriptionModel, PaymentModel, UserModel, GuildModel
 from bot.services.notifications import NotificationService
 from bot.services.oxapay import OxaPayClient
-from bot.config import BOT_OWNER_DISCORD_ID, PRICING, DASHBOARD_URL
-from bot.config import COLOR_SUCCESS, COLOR_NOTICE, COLOR_WARNING, COLOR_CRITICAL
-from bot.utils.embed_style import style_embed
+from bot.config import API_DOMAIN, PRICING, COLOR_WARNING
+from bot.utils.embed_style import style_embed, send_localized_embed, strip_emojis, _normalize_lang
+from bot.utils.i18n import i18n
 
 
-PAYPAL_INSTRUCTIONS_TEMPLATE = """
-**Etapes pour payer via PayPal :**
-
-1. Allez sur **paypal.com** -> Envoyer de l'argent
-2. Entrez l'adresse : `{paypal_email}`
-3. Montant : **{amount:.2f} EUR**
-4. **Sur mobile** : appuyez sur *Ajouter une note*
-   **Sur ordinateur** : cliquez sur *Ajouter un message*
-5. Dans ce champ, ecrivez **exactement** :
-```text
-{order_id}
-```
-6. Envoyez le paiement
-
-**ATTENTION :** Sans cette reference dans le message PayPal, nous ne pourrons pas associer votre paiement a votre commande.
-
-Mobile PayPal :
-Envoyer -> [montant] -> Selectionner contact -> Ajouter une note
-
-Web PayPal :
-Envoyer de l'argent -> Payer pour des biens/services -> Ajouter un message au vendeur
-
-Activation sous 24h apres reception et verification.
-
-Votre abonnement sera actif pendant **30 jours** apres validation.
-Pour qu'il reste actif, vous devrez **repayer avant la date d'expiration**.
-Sans renouvellement, les options du plan choisi pourront etre desactivees.
-""".strip()
+# PAYPAL_INSTRUCTIONS_TEMPLATE removed - using i18n system
 
 
 class PaymentsCog(commands.Cog):
@@ -81,14 +54,17 @@ class PaymentsCog(commands.Cog):
             discord.app_commands.Choice(name="Crypto (BTC, ETH, USDT)", value="oxapay"),
         ],
         plan=[
-            discord.app_commands.Choice(name="Premium (2 EUR/mois)", value="premium"),
-            discord.app_commands.Choice(name="Pro (5 EUR/mois)",     value="pro"),
+            discord.app_commands.Choice(name="Starter (4 EUR/mois)",  value="starter"),
+            discord.app_commands.Choice(name="Pro (12 EUR/mois)",     value="pro"),
+            discord.app_commands.Choice(name="Business (29 EUR/mois)", value="business"),
         ]
     )
     async def pay(self, interaction: discord.Interaction, method: str, plan: str):
         if not interaction.user.guild_permissions.administrator:
-            await interaction.response.send_message(
-                "Vous devez etre administrateur du serveur pour effectuer un paiement.",
+            await send_localized_embed(
+                interaction,
+                "common.error",
+                "payments.admin_required",
                 ephemeral=True
             )
             return
@@ -97,7 +73,12 @@ class PaymentsCog(commands.Cog):
 
         amount = PRICING.get(plan, 0)
         if not amount:
-            await interaction.followup.send("Plan invalide.", ephemeral=True)
+            await send_localized_embed(
+                interaction,
+                "common.error",
+                "payments.invalid_plan",
+                ephemeral=True
+            )
             return
 
         # S'assurer que l'utilisateur est en DB
@@ -126,19 +107,21 @@ class PaymentsCog(commands.Cog):
 
         logger.info(f"Paiement initialise: {order_id} ({method} / {plan})")
 
-    # ------------------------------------------------------------------
     # PayPal
     # ------------------------------------------------------------------
 
     async def _handle_paypal(self, interaction: discord.Interaction,
                               order_id: str, plan: str, amount: float):
-        paypal_email = os.getenv("PAYPAL_EMAIL", "[Email PayPal non configure]")
-        message = PAYPAL_INSTRUCTIONS_TEMPLATE.format(
+        paypal_email = os.getenv("PAYPAL_EMAIL", "billing@veridiancloud.xyz")
+        await send_localized_embed(
+            interaction,
+            "payments.paypal_title",
+            "payments.paypal_instructions",
             paypal_email=paypal_email,
             amount=amount,
             order_id=order_id,
+            ephemeral=True
         )
-        await interaction.followup.send(message, ephemeral=True)
 
         await self.notifications.send_paypal_order_notification(
             interaction.user.id, order_id, plan, amount, interaction.guild.id
@@ -150,28 +133,35 @@ class PaymentsCog(commands.Cog):
 
     async def _handle_giftcard(self, interaction: discord.Interaction,
                                 order_id: str, plan: str, amount: float):
-        embed = discord.Embed(
-            title="Carte Cadeau",
-            color=discord.Color(COLOR_SUCCESS),
-            description=(
-                f"Plan : **{plan.upper()}** | Montant : **{amount:.2f} EUR**\n\n"
-                "Vous allez recevoir un DM pour envoyer votre code et l'image de la carte."
-            )
+        locale = _normalize_lang(interaction.user.locale or interaction.guild.preferred_locale, "fr")
+        await send_localized_embed(
+            interaction,
+            "payments.giftcard_title",
+            "payments.giftcard_desc",
+            plan=plan.upper(),
+            amount=amount,
+            ephemeral=True
         )
-        await interaction.followup.send(embed=style_embed(embed), ephemeral=True)
 
         def check(msg: discord.Message):
             return (msg.author.id == interaction.user.id
                     and isinstance(msg.channel, discord.DMChannel))
-
         try:
-            await interaction.user.send(
-                f"Envoyez le code de votre carte cadeau (commande : {order_id}) :"
+            embed = discord.Embed(
+                title=i18n.get("payments.giftcard_title", locale),
+                description=i18n.get("payments.giftcard_dm_code", locale, order_id=order_id)
             )
-            code_msg = await self.bot.wait_for("message", check=check, timeout=600)
-            giftcard_code = code_msg.content
+            await interaction.user.send(embed=style_embed(embed))
 
-            await interaction.user.send("Envoyez maintenant une image de la carte cadeau :")
+            code_msg = await self.bot.wait_for("message", check=check, timeout=600)
+            giftcard_code = strip_emojis(code_msg.content)
+
+            embed = discord.Embed(
+                title=i18n.get("payments.giftcard_title", locale),
+                description=i18n.get("payments.giftcard_dm_image", locale)
+            )
+            await interaction.user.send(embed=style_embed(embed))
+
             img_msg   = await self.bot.wait_for("message", check=check, timeout=600)
             image_url = img_msg.attachments[0].url if img_msg.attachments else None
 
@@ -181,49 +171,54 @@ class PaymentsCog(commands.Cog):
                 interaction.user.id, order_id, plan, amount,
                 interaction.guild.id, giftcard_code, image_url
             )
-            await interaction.user.send(
-                "Merci ! Votre commande est en attente de validation (max 24h)."
+            
+            embed = discord.Embed(
+                title=i18n.get("common.success", locale),
+                description=i18n.get("payments.giftcard_dm_success", locale)
             )
+            await interaction.user.send(embed=style_embed(embed))
 
         except asyncio.TimeoutError:
-            await interaction.user.send("Delai depasse. Veuillez recommencer.")
+            embed = discord.Embed(
+                title=i18n.get("common.error", locale),
+                description=i18n.get("payments.giftcard_dm_timeout", locale)
+            )
+            await interaction.user.send(embed=style_embed(embed))
         except Exception as e:
             logger.error(f"Erreur giftcard: {e}")
-            await interaction.user.send(f"Erreur : {e}")
+            embed = discord.Embed(
+                title=i18n.get("common.error", locale),
+                description=f"Error: {strip_emojis(str(e))}"
+            )
+            await interaction.user.send(embed=style_embed(embed))
 
     # ------------------------------------------------------------------
     # Crypto via OxaPay
     # ------------------------------------------------------------------
 
     async def _handle_crypto(self, interaction: discord.Interaction,
-                              order_id: str, plan: str, amount: float):
-        await interaction.followup.send(
-            "Generation de l'invoice en cours...", ephemeral=True
-        )
+                                order_id: str, plan: str, amount: float):
+        await send_localized_embed(interaction, "common.loading", "payments.crypto_loading", ephemeral=True)
         try:
-            callback_url = "https://api.veridiancloud.xyz/webhook/oxapay"
+            callback_url = f"https://{os.getenv('API_DOMAIN', API_DOMAIN)}/webhook/oxapay"
             invoice      = await self.oxapay.create_invoice(
                 interaction.user.id, amount, order_id, callback_url
             )
 
             if not invoice or "payLink" not in invoice:
-                await interaction.followup.send(
-                    "Erreur lors de la creation de l'invoice. Reessayez.", ephemeral=True
-                )
+                await send_localized_embed(interaction, "common.error", "payments.crypto_error", ephemeral=True)
                 return
 
+            locale = _normalize_lang(interaction.user.locale or interaction.guild.preferred_locale, "fr")
             embed = discord.Embed(
-                title="Paiement Crypto",
+                title=i18n.get("payments.crypto_title", locale),
                 color=discord.Color(COLOR_WARNING),
-                description=(
-                    f"Plan : **{plan.upper()}** | Montant : **{amount:.2f} EUR**\n\n"
-                    "Cliquez sur le bouton ci-dessous pour effectuer votre paiement.\n"
-                    "Le bot sera notifie automatiquement a la reception du paiement."
-                )
+                description=i18n.get("payments.crypto_desc", locale, plan=plan.upper(), amount=amount)
             )
             view = discord.ui.View()
-            view.add_item(discord.ui.Button(label="Payer maintenant", url=invoice["payLink"]))
-            await interaction.followup.send(embed=style_embed(embed), view=view, ephemeral=True)
+            view.add_item(discord.ui.Button(label=i18n.get("payments.pay_now_button", locale), url=invoice["payLink"]))
+            style_embed(embed)
+            await interaction.followup.send(embed=embed, view=view, ephemeral=True)
 
         except Exception as e:
             logger.error(f"Erreur crypto: {e}")

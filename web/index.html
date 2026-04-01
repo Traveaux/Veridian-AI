@@ -277,8 +277,8 @@
   <section class="pricing" id="pricing">
     <div class="reveal" style="text-align:center">
       <div class="section-label" data-i18n="section_pricing">Tarifs</div>
-      <h2 class="section-title" data-i18n="section_pricing_title">Commencez gratuitement</h2>
-      <p class="section-sub" style="margin:0 auto" data-i18n="section_pricing_sub">Passez à un plan supérieur quand votre communauté grandit.</p>
+      <h2 class="section-title" data-i18n="section_pricing_title">Commencez gratuitement, montez en puissance ensuite</h2>
+      <p class="section-sub" style="margin:0 auto" data-i18n="section_pricing_sub">Starter, Pro ou Business selon votre volume. -25% en annuel, add-ons disponibles à la carte.</p>
     </div>
 
     <div class="pricing-grid">
@@ -300,12 +300,12 @@
         <a href="#" class="btn btn-outline" style="width:100%;justify-content:center" data-discord data-i18n="btn_start_free">Commencer gratuitement</a>
       </div>
 
-      <!-- Premium -->
+      <!-- Starter -->
       <div class="pricing-card featured reveal reveal-delay-2">
-        <div class="featured-badge"><svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="margin-right:6px"><path d="M12 3l2.4 5 5.6.8-4 3.9.9 5.6L12 15.9 7.1 18.3l.9-5.6-4-3.9 5.6-.8z"></path></svg><span data-i18n="plan_premium_badge">POPULAIRE</span></div>
-        <div class="plan-name" data-i18n="plan_premium">Premium</div>
-        <div class="plan-price"><span class="plan-currency">€</span><span data-i18n="plan_premium_price">2</span><span data-i18n="price_per_month">/mois</span></div>
-        <div class="plan-desc" data-i18n="plan_premium_desc">Pour les communautés actives avec un support international.</div>
+        <div class="featured-badge"><svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="margin-right:6px"><path d="M12 3l2.4 5 5.6.8-4 3.9.9 5.6L12 15.9 7.1 18.3l.9-5.6-4-3.9 5.6-.8z"></path></svg><span data-i18n="plan_starter_badge">POPULAIRE</span></div>
+        <div class="plan-name" data-i18n="plan_starter">Starter</div>
+        <div class="plan-price"><span class="plan-currency">€</span><span data-i18n="plan_starter_price">4</span><span data-i18n="price_per_month">/mois</span></div>
+        <div class="plan-desc" data-i18n="plan_starter_desc">Pour les communautés actives qui veulent un vrai support structuré.</div>
         <ul class="plan-features">
           <li data-i18n="plan_feature_tickets_500">500 tickets / mois</li>
           <li data-i18n="plan_feature_langs_20">20 langues de traduction</li>
@@ -316,14 +316,14 @@
           <li data-i18n="plan_feature_stats_basic">Statistiques basiques</li>
           <li class="dim" data-i18n="plan_feature_suggestions">Suggestions staff IA</li>
         </ul>
-        <a href="#" class="btn btn-primary" style="width:100%;justify-content:center" data-i18n="btn_upgrade_premium">Passer à Premium</a>
+        <a href="/dashboard" class="btn btn-primary" style="width:100%;justify-content:center" data-i18n="btn_upgrade_starter">Passer à Starter</a>
       </div>
 
       <!-- Pro -->
       <div class="pricing-card reveal reveal-delay-3">
         <div class="plan-name" data-i18n="plan_pro">Pro</div>
-        <div class="plan-price"><span class="plan-currency">€</span><span data-i18n="plan_pro_price">5</span><span data-i18n="price_per_month">/mois</span></div>
-        <div class="plan-desc" data-i18n="plan_pro_desc">Pour les serveurs à fort volume avec des besoins avancés.</div>
+        <div class="plan-price"><span class="plan-currency">€</span><span data-i18n="plan_pro_price">12</span><span data-i18n="price_per_month">/mois</span></div>
+        <div class="plan-desc" data-i18n="plan_pro_desc">Pour les équipes support actives avec automatisation et analytics.</div>
         <ul class="plan-features">
           <li data-i18n="plan_feature_tickets_unlimited">Tickets illimités</li>
           <li data-i18n="plan_feature_langs_all">Toutes les langues (~100)</li>
@@ -334,10 +334,29 @@
           <li data-i18n="plan_feature_stats_advanced">Statistiques avancées</li>
           <li data-i18n="plan_feature_suggestions">Suggestions staff IA</li>
         </ul>
-        <a href="#" class="btn btn-ghost" style="width:100%;justify-content:center;border-color:var(--border2)" data-i18n="btn_upgrade_pro">Passer à Pro</a>
+        <a href="/dashboard" class="btn btn-ghost" style="width:100%;justify-content:center;border-color:var(--border2)" data-i18n="btn_upgrade_pro">Passer à Pro</a>
+      </div>
+
+      <!-- Business -->
+      <div class="pricing-card reveal reveal-delay-4">
+        <div class="plan-name" data-i18n="plan_business">Business</div>
+        <div class="plan-price"><span class="plan-currency">€</span><span data-i18n="plan_business_price">29</span><span data-i18n="price_per_month">/mois</span></div>
+        <div class="plan-desc" data-i18n="plan_business_desc">Pour les opérations avancées avec SLA, workflows et extensions premium.</div>
+        <ul class="plan-features">
+          <li data-i18n="plan_feature_tickets_unlimited">Tickets illimités</li>
+          <li data-i18n="plan_feature_sla">SLA avec breach alerts</li>
+          <li data-i18n="plan_feature_round_robin">Round-robin auto-assignment</li>
+          <li data-i18n="plan_feature_webhooks">Webhooks sortants</li>
+          <li data-i18n="plan_feature_dashboard_advanced">Dashboard avancé</li>
+          <li data-i18n="plan_feature_stats_advanced">Statistiques avancées</li>
+          <li data-i18n="plan_feature_leaderboard">Leaderboard agents</li>
+          <li data-i18n="plan_feature_addons">Add-ons : serveur extra, white-label, tokens IA</li>
+        </ul>
+        <a href="/dashboard" class="btn btn-ghost" style="width:100%;justify-content:center;border-color:var(--border2)" data-i18n="btn_upgrade_business">Passer à Business</a>
       </div>
 
     </div>
+    <p class="section-sub reveal" style="margin:22px auto 0" data-i18n="pricing_note">Tous les plans payants existent en mensuel ou annuel (-25%). Add-ons disponibles selon vos besoins.</p>
   </section>
 
   <!-- ── PAYMENT METHODS ── -->

@@ -14,7 +14,8 @@ from bot.db.models import (
     OrderModel, PaymentModel, KnowledgeBaseModel, AuditLogModel,
     BotStatusModel, TicketMessageModel, AuditLogModel, PendingNotificationModel
 )
-from bot.config import PLAN_LIMITS, DB_TABLE_PREFIX, PRICING, DASHBOARD_URL
+from bot.config import PLAN_LIMITS, DB_TABLE_PREFIX, DASHBOARD_URL
+from bot.billing import get_plan_limits, get_plan_price, get_public_catalog, normalize_interval, normalize_plan
 from bot.services.oxapay import OxaPayClient
 from loguru import logger
 import os
@@ -293,6 +294,7 @@ class TicketPriorityBody(BaseModel):
 class PurchaseBody(BaseModel):
     plan: str
     method: str
+    interval: Optional[str] = "month"
 
 
 # ============================================================================
@@ -306,6 +308,11 @@ def health_check():
             return {"status": "ok", "service": "internal-api"}
     except Exception as e:
         raise HTTPException(status_code=503, detail=f"Database error: {str(e)}")
+
+
+@router.get("/billing/catalog", dependencies=[Depends(verify_internal_auth)])
+def get_billing_catalog():
+    return get_public_catalog()
 
 
 # ============================================================================
@@ -712,7 +719,7 @@ def get_guild_stats(guild_id: int):
 
     if subscription:
         subscription_status = "active"
-        last_subscription_plan = subscription.get("plan")
+        last_subscription_plan = normalize_plan(subscription.get("plan"))
         expires_at = subscription.get("expires_at")
         if expires_at:
             try:
@@ -721,7 +728,7 @@ def get_guild_stats(guild_id: int):
             except Exception:
                 days_until_expiry = None
     elif subscription_record and subscription_record.get("expires_at"):
-        last_subscription_plan = subscription_record.get("plan")
+        last_subscription_plan = normalize_plan(subscription_record.get("plan"))
         expires_at = subscription_record.get("expires_at")
         try:
             if expires_at <= now or int(subscription_record.get("is_active") or 0) == 0:
@@ -739,7 +746,8 @@ def get_guild_stats(guild_id: int):
         "tickets_month":      tickets_month,
         "languages":          languages,
         "daily_counts":       daily_counts,
-        "current_plan":       subscription["plan"] if subscription else "free",
+        "current_plan":       normalize_plan(subscription["plan"]) if subscription else "free",
+        "current_interval":   normalize_interval((subscription or {}).get("billing_interval")),
         "is_subscribed":      bool(subscription),
         "kb_entries":         kb_count,
         "subscription_status": subscription_status,
@@ -777,10 +785,11 @@ def _generate_order_id() -> str:
 
 @router.post("/guild/{guild_id}/purchase", dependencies=[Depends(verify_guild_access)])
 async def create_dashboard_purchase(guild_id: int, body: PurchaseBody, request: Request):
-    plan = str(body.plan or "").strip().lower()
+    plan = normalize_plan(body.plan, default="")
     method = str(body.method or "").strip().lower()
+    interval = normalize_interval(body.interval, default="month")
 
-    if plan not in PRICING:
+    if plan == "free":
         raise HTTPException(status_code=400, detail="Plan invalide")
     if method not in {"paypal", "giftcard", "oxapay"}:
         raise HTTPException(status_code=400, detail="Methode de paiement invalide")
@@ -791,9 +800,23 @@ async def create_dashboard_purchase(guild_id: int, body: PurchaseBody, request: 
 
     actor_id = getattr(request.state, "user_id", 0) or 0
     actor_username = getattr(request.state, "username", "") or None
-    amount = float(PRICING[plan])
+    amount = float(get_plan_price(plan, interval))
     order_id = _generate_order_id()
     payment_data = None
+
+    created = OrderModel.create(
+        order_id=order_id,
+        user_id=actor_id,
+        user_username=actor_username,
+        guild_id=guild_id,
+        guild_name=guild.get("name"),
+        method=method,
+        plan=plan,
+        billing_interval=interval,
+        amount=amount,
+    )
+    if not created:
+        raise HTTPException(status_code=500, detail="Impossible de creer la commande")
 
     if method == "oxapay":
         callback_url = f"https://{os.getenv('API_DOMAIN', 'api.veridiancloud.xyz')}/webhook/oxapay"
@@ -809,19 +832,6 @@ async def create_dashboard_purchase(guild_id: int, body: PurchaseBody, request: 
             "action_url": pay_link,
         }
 
-    created = OrderModel.create(
-        order_id=order_id,
-        user_id=actor_id,
-        user_username=actor_username,
-        guild_id=guild_id,
-        guild_name=guild.get("name"),
-        method=method,
-        plan=plan,
-        amount=amount,
-    )
-    if not created:
-        raise HTTPException(status_code=500, detail="Impossible de creer la commande")
-
     if payment_data is None:
         if method == "paypal":
             paypal_email = os.getenv("PAYPAL_EMAIL", "[Email PayPal non configure]")
@@ -832,7 +842,7 @@ async def create_dashboard_purchase(guild_id: int, body: PurchaseBody, request: 
                     "Etapes pour payer via PayPal :\n\n"
                     "1. Allez sur paypal.com -> Envoyer de l'argent\n"
                     f"2. Entrez l'adresse : {paypal_email}\n"
-                    f"3. Montant : {amount:.2f} EUR\n"
+                    f"3. Montant : {amount:.2f} EUR ({'annuel' if interval == 'year' else 'mensuel'})\n"
                     "4. Sur mobile : appuyez sur Ajouter une note\n"
                     "   Sur ordinateur : cliquez sur Ajouter un message\n"
                     "5. Dans ce champ, ecrivez exactement la reference ci-dessous\n"
@@ -857,7 +867,7 @@ async def create_dashboard_purchase(guild_id: int, body: PurchaseBody, request: 
                 "description": (
                     "La commande est creee. Ouvrez un ticket ou contactez le support avec le code de la carte "
                     f"et la reference {order_id} pour validation.\n\n"
-                    "Une fois valide, l'abonnement reste actif 30 jours. Vous devrez repayer avant expiration "
+                    f"Une fois valide, l'abonnement reste actif {'1 an' if interval == 'year' else '30 jours'}. Vous devrez repayer avant expiration "
                     "pour le garder actif et pour eviter la desactivation des options du plan."
                 ),
                 "reference": order_id,
@@ -871,7 +881,7 @@ async def create_dashboard_purchase(guild_id: int, body: PurchaseBody, request: 
         guild_id=guild_id,
         action="order.create",
         target_id=order_id,
-        details={"plan": plan, "method": method, "amount": amount},
+        details={"plan": plan, "method": method, "amount": amount, "billing_interval": interval},
         ip_address=request.client.host if request.client else None,
     )
 
@@ -880,6 +890,7 @@ async def create_dashboard_purchase(guild_id: int, body: PurchaseBody, request: 
         "order_id": order_id,
         "guild_id": guild_id,
         "plan": plan,
+        "billing_interval": interval,
         "method": method,
         "amount": amount,
         "payment": payment_data,
@@ -918,13 +929,15 @@ def update_order_status(order_id: str, body: OrderStatusBody, request: Request):
     )
 
     if body.status == "paid":
-        plan = body.plan or order.get("plan", "premium")
+        plan = normalize_plan(body.plan or order.get("plan"), default="starter")
+        interval = normalize_interval(order.get("billing_interval"), default="month")
         payment_id = PaymentModel.create(
             user_id=order["user_id"],
             guild_id=order["guild_id"],
             method=order["method"],
             amount=float(order["amount"] or 0),
             plan=plan,
+            billing_interval=interval,
             order_id=order_id,
             status="completed"
         )
@@ -933,7 +946,7 @@ def update_order_status(order_id: str, body: OrderStatusBody, request: Request):
             user_id=order["user_id"],
             plan=plan,
             payment_id=payment_id,
-            duration_days=30
+            billing_interval=interval
         )
         sub = SubscriptionModel.get(order["guild_id"]) or {}
         expiry = sub.get("expires_at")
@@ -968,7 +981,7 @@ def activate_subscription(body: ActivateSubBody, request: Request):
     SubscriptionModel.create(
         guild_id=body.guild_id,
         user_id=0,
-        plan=body.plan,
+        plan=normalize_plan(body.plan, default="starter"),
         duration_days=body.duration_days
     )
     AuditLogModel.log(
@@ -1000,7 +1013,7 @@ def revoke_subscription(body: RevokeSubBody, request: Request):
 def get_kb(guild_id: int):
     entries = KnowledgeBaseModel.get_by_guild(guild_id)
     limit   = PLAN_LIMITS.get(
-        (SubscriptionModel.get(guild_id) or {}).get("plan", "free"), {}
+        normalize_plan((SubscriptionModel.get(guild_id) or {}).get("plan", "free"))
     ).get("kb_entries", 0)
     return {
         "guild_id": guild_id,
@@ -1014,8 +1027,8 @@ def get_kb(guild_id: int):
 def create_kb_entry(guild_id: int, body: KBEntryBody, request: Request):
     # Verifier la limite du plan
     sub   = SubscriptionModel.get(guild_id)
-    plan  = (sub or {}).get("plan", "free")
-    limit = PLAN_LIMITS.get(plan, {}).get("kb_entries", 0)
+    plan  = normalize_plan((sub or {}).get("plan", "free"))
+    limit = get_plan_limits(plan).get("kb_entries", 0)
     current_count = KnowledgeBaseModel.count(guild_id)
 
     if limit is not None and current_count >= limit:

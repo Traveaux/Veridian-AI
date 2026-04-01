@@ -59,15 +59,20 @@
     <div class="billing-modal-body">
       <div class="billing-modal-view active" data-billing-modal-view="plans">
         <div class="billing-info-grid">
-          <div class="billing-info-card">
-            <div class="billing-plan-name">Premium</div>
-            <div class="billing-plan-price">2€<span>/mois</span></div>
-            <p data-i18n="plan_premium_desc">Pour les communautés actives avec un support international.</p>
+          <div class="billing-info-card" data-billing-plan-card="starter">
+            <div class="billing-plan-name" data-i18n="plan_starter">Starter</div>
+            <div class="billing-plan-price">4€<span data-i18n="price_per_month">/mois</span></div>
+            <p data-i18n="plan_starter_desc">Premier plan payant pour les serveurs qui veulent dépasser le mode découverte.</p>
           </div>
-          <div class="billing-info-card featured">
-            <div class="billing-plan-name">Pro</div>
-            <div class="billing-plan-price">5€<span>/mois</span></div>
-            <p data-i18n="plan_pro_desc">Pour les serveurs à fort volume avec des besoins avancés.</p>
+          <div class="billing-info-card featured" data-billing-plan-card="pro">
+            <div class="billing-plan-name" data-i18n="plan_pro">Pro</div>
+            <div class="billing-plan-price">12€<span data-i18n="price_per_month">/mois</span></div>
+            <p data-i18n="plan_pro_desc">Le plan principal pour les équipes support actives avec automatisation et analytics.</p>
+          </div>
+          <div class="billing-info-card" data-billing-plan-card="business">
+            <div class="billing-plan-name" data-i18n="plan_business">Business</div>
+            <div class="billing-plan-price">29€<span data-i18n="price_per_month">/mois</span></div>
+            <p data-i18n="plan_business_desc">Pour les opérations avancées: SLA, workflows et add-ons premium.</p>
           </div>
         </div>
       </div>
@@ -471,15 +476,33 @@
           <div class="card-body">
             <div class="billing-builder">
               <div class="billing-selector-group">
+                <div class="billing-selector-label">Choisir une durée</div>
+                <div class="billing-choice-grid" id="billing-interval-selector">
+                  <button class="billing-choice active" data-billing-interval="month" type="button">
+                    <span class="billing-choice-title">Mensuel</span>
+                    <span class="billing-choice-meta">Flexibilité maximale</span>
+                  </button>
+                  <button class="billing-choice" data-billing-interval="year" type="button">
+                    <span class="billing-choice-title">Annuel</span>
+                    <span class="billing-choice-meta">-25%</span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="billing-selector-group">
                 <div class="billing-selector-label" data-i18n="dash_billing_choose_plan">Choisir un abonnement</div>
                 <div class="billing-choice-grid" id="billing-plan-selector">
-                  <button class="billing-choice active" data-billing-plan="premium" type="button">
-                    <span class="billing-choice-title">Premium</span>
-                    <span class="billing-choice-meta">2€/mois</span>
+                  <button class="billing-choice active" data-billing-plan="starter" type="button">
+                    <span class="billing-choice-title" data-i18n="plan_starter">Starter</span>
+                    <span class="billing-choice-meta">4€/mois</span>
                   </button>
                   <button class="billing-choice" data-billing-plan="pro" type="button">
-                    <span class="billing-choice-title">Pro</span>
-                    <span class="billing-choice-meta">5€/mois</span>
+                    <span class="billing-choice-title" data-i18n="plan_pro">Pro</span>
+                    <span class="billing-choice-meta">12€/mois</span>
+                  </button>
+                  <button class="billing-choice" data-billing-plan="business" type="button">
+                    <span class="billing-choice-title" data-i18n="plan_business">Business</span>
+                    <span class="billing-choice-meta">29€/mois</span>
                   </button>
                 </div>
               </div>
@@ -504,7 +527,7 @@
 
               <div class="billing-note-card billing-purchase-summary" id="billing-purchase-summary">
                 <div class="billing-kicker" data-i18n="dash_billing_summary">Résumé</div>
-                <div style="font-size:13px;color:var(--text);font-weight:700" id="billing-summary-title">Premium · Crypto</div>
+                <div style="font-size:13px;color:var(--text);font-weight:700" id="billing-summary-title">Starter · Mensuel · Crypto</div>
                 <div style="font-size:11.5px;color:var(--text2);line-height:1.6;margin-top:6px" id="billing-summary-description">
                   Paiement automatique via OxaPay.
                 </div>
@@ -1026,8 +1049,9 @@
               <div class="form-group" style="flex:1;min-width:120px;margin-bottom:0">
                 <label class="form-label" data-i18n="dash_plan">Plan</label>
                 <select class="form-select" id="admin-plan">
-                  <option value="premium">Premium — 2€</option>
-                  <option value="pro">Pro — 5€</option>
+                  <option value="starter">Starter — 4€</option>
+                  <option value="pro">Pro — 12€</option>
+                  <option value="business">Business — 29€</option>
                 </select>
               </div>
               <button class="btn btn-primary btn-sm" data-action="admin-activate-sub" type="button" data-i18n="dash_activate">Activer</button>

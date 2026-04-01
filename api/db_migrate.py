@@ -556,6 +556,85 @@ def _ensure_subscription_migrations() -> None:
                     logger.warning(f"[db] ALTER {table}.reminder_sent: {e}")
 
 
+def _ensure_billing_vnext_migrations() -> None:
+    column_specs = {
+        f"{DB_TABLE_PREFIX}guilds": {
+            "tier": "VARCHAR(32) DEFAULT 'free'",
+        },
+        f"{DB_TABLE_PREFIX}orders": {
+            "method": "VARCHAR(32) NULL",
+            "plan": "VARCHAR(32) NULL",
+            "billing_interval": "VARCHAR(16) DEFAULT 'month'",
+        },
+        f"{DB_TABLE_PREFIX}payments": {
+            "method": "VARCHAR(32) NULL",
+            "plan": "VARCHAR(32) NULL",
+            "billing_interval": "VARCHAR(16) DEFAULT 'month'",
+        },
+        f"{DB_TABLE_PREFIX}subscriptions": {
+            "plan": "VARCHAR(32) NULL",
+            "billing_interval": "VARCHAR(16) DEFAULT 'month'",
+        },
+    }
+
+    for table, columns in column_specs.items():
+        if not _table_exists(table):
+            continue
+        for column_name, column_sql in columns.items():
+            info = _column_info(table, column_name)
+            if info is None:
+                with get_db_context() as conn:
+                    cursor = conn.cursor()
+                    try:
+                        cursor.execute(f"ALTER TABLE {table} ADD COLUMN {column_name} {column_sql}")
+                        logger.info(f"[db] Colonne {column_name} ajoutee a {table}")
+                    except Exception as e:
+                        if "duplicate column" not in str(e).lower():
+                            logger.warning(f"[db] ALTER {table}.{column_name}: {e}")
+                continue
+
+            data_type = str(info.get("data_type") or "").lower()
+            col_type = str(info.get("column_type") or "").lower()
+            needs_modify = False
+            if data_type == "enum":
+                needs_modify = True
+            elif column_name == "billing_interval" and ("varchar" not in data_type):
+                needs_modify = True
+            elif column_name in {"tier", "plan", "method"} and "varchar" not in data_type:
+                needs_modify = True
+            elif column_name in {"tier", "plan", "method"} and data_type == "varchar":
+                max_len = int(info.get("character_maximum_length") or 0)
+                if max_len < 16:
+                    needs_modify = True
+
+            if needs_modify:
+                with get_db_context() as conn:
+                    cursor = conn.cursor()
+                    try:
+                        cursor.execute(f"ALTER TABLE {table} MODIFY COLUMN {column_name} {column_sql}")
+                        logger.info(f"[db] Colonne {table}.{column_name} convertie en mode billing vNext")
+                    except Exception as e:
+                        logger.warning(f"[db] MODIFY {table}.{column_name}: {e}")
+
+    replacements = (
+        (f"{DB_TABLE_PREFIX}guilds", "tier"),
+        (f"{DB_TABLE_PREFIX}orders", "plan"),
+        (f"{DB_TABLE_PREFIX}payments", "plan"),
+        (f"{DB_TABLE_PREFIX}subscriptions", "plan"),
+    )
+    for table, column_name in replacements:
+        if not _table_exists(table):
+            continue
+        with get_db_context() as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    f"UPDATE {table} SET {column_name} = 'starter' WHERE LOWER({column_name}) = 'premium'"
+                )
+            except Exception as e:
+                logger.warning(f"[db] UPDATE legacy plan alias on {table}.{column_name}: {e}")
+
+
 def ensure_database_schema() -> None:
     """
     Creates/migrates the MySQL schema at API startup using the `database/` folder.
@@ -586,6 +665,7 @@ def ensure_database_schema() -> None:
     _ensure_guild_v04_migrations()
     _ensure_audit_log_and_notifications_migrations()
     _ensure_subscription_migrations()
+    _ensure_billing_vnext_migrations()
 
     # 3) Re-apply views (so they can reference the new columns).
     try:
