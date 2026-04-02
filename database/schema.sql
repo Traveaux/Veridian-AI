@@ -663,12 +663,12 @@ CREATE TABLE IF NOT EXISTS vai_ticket_notes (
 CREATE TABLE IF NOT EXISTS vai_snippets (
     id              INT AUTO_INCREMENT PRIMARY KEY,
     guild_id        BIGINT          NOT NULL        COMMENT 'Discord Guild ID',
-    trigger         VARCHAR(50)     NOT NULL        COMMENT 'Mot-cle declencheur ex: bonjour',
+    `trigger`       VARCHAR(50)     NOT NULL        COMMENT 'Mot-cle declencheur ex: bonjour',
     content         TEXT            NOT NULL        COMMENT 'Contenu de la reponse',
     language        VARCHAR(10)     DEFAULT 'fr'    COMMENT 'Langue du snippet',
     auto_translate  TINYINT(1)      DEFAULT 1       COMMENT 'Traduire automatiquement',
     created_at      TIMESTAMP       DEFAULT CURRENT_TIMESTAMP,
-    UNIQUE KEY uniq_guild_trigger (guild_id, trigger),
+    UNIQUE KEY uniq_guild_trigger (guild_id, `trigger`),
     KEY idx_guild   (guild_id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

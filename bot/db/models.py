@@ -2089,7 +2089,7 @@ class SnippetModel:
             try:
                 cursor.execute(
                     f"""
-                    INSERT INTO {DB_TABLE_PREFIX}snippets (guild_id, trigger, content, language, auto_translate)
+                    INSERT INTO {DB_TABLE_PREFIX}snippets (guild_id, `trigger`, content, language, auto_translate)
                     VALUES (%s, %s, %s, %s, %s)
                     """,
                     (guild_id, trigger.lower(), content, language, 1 if auto_translate else 0)
@@ -2104,7 +2104,7 @@ class SnippetModel:
         with get_db_context() as conn:
             cursor = conn.cursor(dictionary=True)
             cursor.execute(
-                f"SELECT * FROM {DB_TABLE_PREFIX}snippets WHERE guild_id = %s ORDER BY trigger",
+                f"SELECT * FROM {DB_TABLE_PREFIX}snippets WHERE guild_id = %s ORDER BY `trigger`",
                 (guild_id,)
             )
             return cursor.fetchall()
@@ -2114,7 +2114,7 @@ class SnippetModel:
         with get_db_context() as conn:
             cursor = conn.cursor(dictionary=True)
             cursor.execute(
-                f"SELECT * FROM {DB_TABLE_PREFIX}snippets WHERE guild_id = %s AND trigger = %s LIMIT 1",
+                f"SELECT * FROM {DB_TABLE_PREFIX}snippets WHERE guild_id = %s AND `trigger` = %s LIMIT 1",
                 (guild_id, trigger.lower())
             )
             return cursor.fetchone()
