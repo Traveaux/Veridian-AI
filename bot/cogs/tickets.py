@@ -629,12 +629,12 @@ class TicketsCog(commands.Cog):
         user_template = (
             (cfg.get("ticket_welcome_message_user") or "").strip()
             or legacy_template
-            or WELCOME_TEXTS.get(_normalize_lang(user_language), WELCOME_TEXTS["en"])["user"]
+            or i18n.get("tickets.default_welcome_user", locale)
         )
         staff_template = (
             (cfg.get("ticket_welcome_message_staff") or "").strip()
             or legacy_template
-            or WELCOME_TEXTS.get(_normalize_lang(staff_language), WELCOME_TEXTS["en"])["staff"]
+            or i18n.get("tickets.default_welcome_staff", locale)
         )
 
         embed = discord.Embed(
@@ -1287,10 +1287,13 @@ class TicketsCog(commands.Cog):
                 await ticket_channel.delete(reason="DB ticket create failed")
             except Exception:
                 pass
-            await interaction.followup.send(
-                "Erreur: impossible de créer le ticket en base de données. Réessayez plus tard.",
-                ephemeral=True,
+            locale = _normalize_lang(str(interaction.locale), "fr")
+            db_err_embed = discord.Embed(
+                title=i18n.get("tickets.db_error_title", locale),
+                description=i18n.get("tickets.db_error_desc", locale),
+                color=discord.Color(COLOR_CRITICAL),
             )
+            await interaction.followup.send(embed=style_embed(db_err_embed), ephemeral=True)
             return
 
         # Upsert utilisateur
@@ -1389,9 +1392,7 @@ class TicketsCog(commands.Cog):
 
         ticket = TicketModel.get_by_channel(interaction.channel.id)
         if not ticket:
-            await interaction.followup.send(
-                "Cette commande est reservee aux channels de tickets.", ephemeral=True
-            )
+            await send_localized_embed(interaction, "tickets.not_in_ticket", ephemeral=True)
             return
 
         is_user  = interaction.user.id == ticket["user_id"]
@@ -1401,11 +1402,11 @@ class TicketsCog(commands.Cog):
         )
 
         if ticket["status"] == "closed":
-            await interaction.followup.send("Ce ticket est déjà fermé.", ephemeral=True)
+            await send_localized_embed(interaction, "tickets.already_closed", ephemeral=True)
             return
 
         if not (is_user or is_staff):
-            await interaction.followup.send("Permission refusee.", ephemeral=True)
+            await send_localized_embed(interaction, "tickets.permission_denied", ephemeral=True)
             return
         if is_staff:
             await self._finalize_ticket_close(

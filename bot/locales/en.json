@@ -87,7 +87,29 @@
         "button_reopen": "Reopen",
         "button_transcript": "Transcript",
         "button_confirm_close": "Confirm Close",
-        "button_taken_by": "Taken by {name}"
+        "button_taken_by": "Taken by {name}",
+        "default_welcome_user": "Hello {user_mention}! Describe your issue and we will help you as soon as possible.",
+        "default_welcome_staff": "New ticket from {user_mention}. User language: {user_language}.",
+        "log_opened_title": "New ticket opened",
+        "log_user": "User",
+        "log_channel": "Channel",
+        "log_language": "Language",
+        "log_topic": "AI-detected reason",
+        "not_assigned": "Not assigned",
+        "blacklisted_title": "Access Denied",
+        "blacklisted_desc": "You are not allowed to open tickets on this server.",
+        "rating_title": "How was your support experience?",
+        "rating_desc": "Rate your experience from 1 to 5 stars.",
+        "rating_thanks": "Thank you for your feedback!",
+        "rating_saved": "Your rating has been saved.",
+        "db_error_title": "Database Error",
+        "db_error_desc": "Unable to create the ticket. Please try again later.",
+        "channel_closing": "This channel will be deleted shortly.",
+        "note_added": "Internal note saved.",
+        "note_title": "Internal Note",
+        "snippet_not_found": "Snippet not found.",
+        "snippet_sent": "Snippet applied.",
+        "not_your_ticket": "This is not your ticket."
     },
     "payments": {
         "plans_title": "Subscription Plans",
@@ -141,5 +163,9 @@
         "status_rejected": "Order rejected",
         "error_not_found": "Order not found.",
         "error_already_processed": "Order already processed (Status: {status})."
+    },
+    "admin": {
+        "blacklist_added": "User added to the blacklist.",
+        "blacklist_removed": "User removed from the blacklist."
     }
 }

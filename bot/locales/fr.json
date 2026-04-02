@@ -87,7 +87,29 @@
         "button_reopen": "Réouvrir",
         "button_transcript": "Transcript",
         "button_confirm_close": "Confirmer la fermeture",
-        "button_taken_by": "Pris par {name}"
+        "button_taken_by": "Pris par {name}",
+        "default_welcome_user": "Bonjour {user_mention} ! Décrivez votre problème et nous vous aiderons dès que possible.",
+        "default_welcome_staff": "Nouveau ticket de {user_mention}. Langue de l'utilisateur : {user_language}.",
+        "log_opened_title": "Nouveau ticket ouvert",
+        "log_user": "Utilisateur",
+        "log_channel": "Salon",
+        "log_language": "Langue",
+        "log_topic": "Raison détectée par l'IA",
+        "not_assigned": "Non assigné",
+        "blacklisted_title": "Accès refusé",
+        "blacklisted_desc": "Vous n'êtes pas autorisé à ouvrir des tickets sur ce serveur.",
+        "rating_title": "Comment était votre expérience de support ?",
+        "rating_desc": "Évaluez votre expérience de 1 à 5 étoiles.",
+        "rating_thanks": "Merci pour votre retour !",
+        "rating_saved": "Votre évaluation a été enregistrée.",
+        "db_error_title": "Erreur base de données",
+        "db_error_desc": "Impossible de créer le ticket. Veuillez réessayer plus tard.",
+        "channel_closing": "Ce salon sera supprimé dans quelques instants.",
+        "note_added": "Note interne enregistrée.",
+        "note_title": "Note interne",
+        "snippet_not_found": "Snippet introuvable.",
+        "snippet_sent": "Snippet appliqué.",
+        "not_your_ticket": "Ce n'est pas votre ticket."
     },
     "payments": {
         "plans_title": "Plans d'abonnement",
@@ -141,5 +163,9 @@
         "status_rejected": "Commande rejetée",
         "error_not_found": "Commande introuvable.",
         "error_already_processed": "Commande déjà traitée (Statut : {status})."
+    },
+    "admin": {
+        "blacklist_added": "Utilisateur ajouté à la liste noire.",
+        "blacklist_removed": "Utilisateur retiré de la liste noire."
     }
 }

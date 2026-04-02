@@ -86,7 +86,7 @@ def style_embed(embed: discord.Embed) -> discord.Embed:
         embed.set_field_at(index, name=name, value=value, inline=field.inline)
 
     if not embed.color:
-        embed.color = discord.Color.from_rgb(0, 255, 0)  # Neon Green / Veridian
+        embed.color = discord.Color(COLOR_SUCCESS)
 
     if embed.footer.text:
         footer_text = strip_emojis(embed.footer.text)

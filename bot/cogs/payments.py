@@ -222,7 +222,12 @@ class PaymentsCog(commands.Cog):
 
         except Exception as e:
             logger.error(f"Erreur crypto: {e}")
-            await interaction.followup.send(f"Erreur : {e}", ephemeral=True)
+            error_embed = discord.Embed(
+                title=i18n.get("common.error", "en"),
+                description=strip_emojis(str(e)) or "Unknown error",
+                color=discord.Color(COLOR_WARNING),
+            )
+            await interaction.followup.send(embed=style_embed(error_embed), ephemeral=True)
 
 
 async def setup(bot):

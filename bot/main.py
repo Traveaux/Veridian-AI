@@ -209,7 +209,13 @@ async def notification_processor_loop():
                 # Récupérer l'utilisateur
                 user = bot.get_user(notif["user_id"]) or await bot.fetch_user(notif["user_id"])
                 if user:
-                    await user.send(notif["message"])
+                    notif_embed = discord.Embed(
+                        title="Veridian AI",
+                        description=notif["message"],
+                        color=discord.Color(0x2DFF8F),
+                    )
+                    from bot.utils.embed_style import style_embed
+                    await user.send(embed=style_embed(notif_embed))
                     PendingNotificationModel.delete(notif["id"])
                     logger.debug(f"DM envoyé a {notif['user_id']}")
                 else:
