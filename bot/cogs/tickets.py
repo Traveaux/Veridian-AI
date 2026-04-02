@@ -11,9 +11,9 @@ import io
 import json
 from datetime import datetime
 
-from bot.db.models import TicketModel, GuildModel, UserModel, TicketMessageModel
+from bot.db.models import TicketModel, GuildModel, UserModel, TicketMessageModel, PendingActionModel, TicketSatisfactionModel
 from bot.db.connection import get_db_context
-from bot.config import DB_TABLE_PREFIX
+from bot.config import DB_TABLE_PREFIX, COLOR_SUCCESS, COLOR_NOTICE, COLOR_WARNING, COLOR_CRITICAL, BOT_OWNER_DISCORD_ID
 from bot.services.translator import TranslatorService
 from bot.services.groq_client import GroqClient
 from bot.utils.embed_style import style_embed, translation_embed_title, send_localized_embed, strip_emojis, _normalize_lang
@@ -96,6 +96,35 @@ def _compute_ticket_metrics(ticket: dict, messages: list[dict]) -> dict[str, str
     }
 
 
+def _safe_int(val) -> int | None:
+    """Safely convert a value to int, returning None on failure."""
+    if val is None:
+        return None
+    try:
+        return int(val)
+    except (ValueError, TypeError):
+        return None
+
+
+_LANG_NAMES = {
+    "fr": "French", "en": "English", "es": "Spanish", "de": "German",
+    "it": "Italian", "pt": "Portuguese", "nl": "Dutch", "ru": "Russian",
+    "ja": "Japanese", "ko": "Korean", "zh": "Chinese", "ar": "Arabic",
+    "hi": "Hindi", "tr": "Turkish", "pl": "Polish", "sv": "Swedish",
+    "da": "Danish", "no": "Norwegian", "fi": "Finnish", "cs": "Czech",
+    "ro": "Romanian", "hu": "Hungarian", "uk": "Ukrainian", "el": "Greek",
+    "th": "Thai", "vi": "Vietnamese", "id": "Indonesian", "ms": "Malay",
+}
+
+
+def get_lang_name(code: str | None) -> str:
+    """Return the English name for a language code, or the code itself."""
+    if not code:
+        return "Unknown"
+    normalized = _normalize_lang(code, "en")
+    return _LANG_NAMES.get(normalized, normalized.upper())
+
+
 def _safe_filename_part(value: str | None, fallback: str) -> str:
     raw = "".join(ch if ch.isalnum() or ch in {"-", "_"} else "-" for ch in str(value or fallback).strip().lower())
     clean = raw.strip("-_")
@@ -169,10 +198,134 @@ class TicketsCog(commands.Cog):
         self.groq_client = GroqClient()
         self._label_translation_cache: dict[tuple[str, str, str], str] = {}
         self.auto_close_task.start()
+        self.sla_check_task.start()  # Task 5.6: SLA breach checker
         logger.info("Cog Tickets charge")
 
     def cog_unload(self):
         self.auto_close_task.cancel()
+        self.sla_check_task.cancel()
+
+    # ── Task 5.5: Round-robin auto-assignment ──
+    def _get_round_robin_staff(self, guild: discord.Guild, staff_role_id: int | None) -> discord.Member | None:
+        """Get next available staff member using round-robin based on current ticket load."""
+        if not staff_role_id:
+            return None
+        
+        staff_role = guild.get_role(int(staff_role_id))
+        if not staff_role:
+            return None
+        
+        # Get all staff members with the role
+        staff_members = [m for m in staff_role.members if not m.bot]
+        if not staff_members:
+            return None
+        
+        # Get current ticket counts per staff
+        try:
+            with get_db_context() as conn:
+                cursor = conn.cursor(dictionary=True)
+                cursor.execute(
+                    f"""
+                    SELECT assigned_staff_id, COUNT(*) as count
+                    FROM {DB_TABLE_PREFIX}tickets
+                    WHERE guild_id = %s AND status IN ('open', 'in_progress')
+                    AND assigned_staff_id IS NOT NULL
+                    GROUP BY assigned_staff_id
+                    """,
+                    (guild.id,)
+                )
+                ticket_counts = {row["assigned_staff_id"]: row["count"] for row in cursor.fetchall()}
+        except Exception:
+            ticket_counts = {}
+        
+        # Find staff with minimum tickets (round-robin logic)
+        min_count = min((ticket_counts.get(m.id, 0) for m in staff_members), default=0)
+        candidates = [m for m in staff_members if ticket_counts.get(m.id, 0) == min_count]
+        
+        if not candidates:
+            return None
+        
+        # Pick the one who was assigned least recently (simple round-robin)
+        import random
+        return random.choice(candidates)
+
+    # ── Task 5.6: SLA Methods ──
+    @tasks.loop(minutes=5)
+    async def sla_check_task(self):
+        """Check for SLA breaches every 5 minutes."""
+        try:
+            with get_db_context() as conn:
+                cursor = conn.cursor(dictionary=True)
+                # Tickets in progress without first response within SLA (default 2 hours for Pro)
+                cursor.execute(
+                    f"""
+                    SELECT t.*, TIMESTAMPDIFF(MINUTE, t.opened_at, NOW()) as minutes_open
+                    FROM {DB_TABLE_PREFIX}tickets t
+                    JOIN {DB_TABLE_PREFIX}guilds g ON t.guild_id = g.id
+                    WHERE t.status IN ('open', 'in_progress')
+                    AND t.assigned_staff_id IS NOT NULL
+                    AND g.plan IN ('pro', 'business')
+                    AND TIMESTAMPDIFF(MINUTE, t.opened_at, NOW()) > 120
+                    AND (t.sla_breach_alert_sent IS NULL OR t.sla_breach_alert_sent = 0)
+                    """
+                )
+                breach_tickets = cursor.fetchall()
+                
+                for ticket in breach_tickets:
+                    await self._send_sla_breach_alert(ticket)
+                    
+        except Exception as e:
+            logger.debug(f"SLA check task error: {e}")
+
+    @sla_check_task.before_loop
+    async def before_sla_check(self):
+        await self.bot.wait_until_ready()
+
+    async def _send_sla_breach_alert(self, ticket: dict):
+        """Send SLA breach alert to log channel and assigned staff."""
+        try:
+            guild = self.bot.get_guild(int(ticket["guild_id"]))
+            if not guild:
+                return
+            
+            guild_config = GuildModel.get(guild.id) or {}
+            log_channel_id = _safe_int(guild_config.get("log_channel_id"))
+            
+            staff_member = guild.get_member(int(ticket["assigned_staff_id"]))
+            minutes_open = ticket.get("minutes_open", 0)
+            
+            # Mark as alerted
+            TicketModel.update(ticket["id"], sla_breach_alert_sent=1)
+            
+            # Send to log channel
+            if log_channel_id:
+                log_chan = self.bot.get_channel(log_channel_id)
+                if log_chan:
+                    embed = discord.Embed(
+                        title="⚠️ SLA Breach Alert",
+                        description=f"Ticket #{ticket['id']} hasn't received a response in {minutes_open} minutes",
+                        color=discord.Color(COLOR_WARNING)
+                    )
+                    embed.add_field(name="Assigned to", value=staff_member.mention if staff_member else "Unknown")
+                    embed.add_field(name="User", value=f"<@{ticket['user_id']}>")
+                    embed.add_field(name="Channel", value=f"<#{ticket['channel_id']}>")
+                    await log_chan.send(embed=style_embed(embed))
+            
+            # DM the assigned staff
+            if staff_member:
+                dm_embed = discord.Embed(
+                    title="⏰ SLA Alert - Response Required",
+                    description=f"Ticket #{ticket['id']} is approaching SLA breach ({minutes_open} minutes open). Please respond ASAP!",
+                    color=discord.Color(COLOR_WARNING)
+                )
+                try:
+                    await staff_member.send(embed=style_embed(dm_embed))
+                except Exception:
+                    pass  # DMs disabled
+                    
+            logger.info(f"SLA breach alert sent for ticket {ticket['id']}")
+        except Exception as e:
+            logger.debug(f"Failed to send SLA alert: {e}")
 
     async def _run_with_typing(self, channel: discord.abc.Messageable, func, *args):
         async with channel.typing():
@@ -724,6 +877,34 @@ class TicketsCog(commands.Cog):
         )
         await self._try_update_welcome_embed(channel, ticket["id"])
 
+        # ── Task 2.3: Send satisfaction rating DM ──
+        try:
+            user = self.bot.get_user(int(ticket["user_id"])) or await self.bot.fetch_user(int(ticket["user_id"]))
+            if user:
+                locale = _normalize_lang(ticket.get("user_language"), "en")
+                rating_embed = discord.Embed(
+                    title=i18n.get("tickets.rating_title", locale),
+                    description=i18n.get("tickets.rating_desc", locale),
+                    color=discord.Color(COLOR_SUCCESS),
+                )
+                rating_embed.set_footer(text=f"Ticket #{ticket['id']}")
+                view = SatisfactionView(ticket["id"], int(ticket["user_id"]), int(ticket.get("guild_id") or 0))
+                await user.send(embed=style_embed(rating_embed), view=view)
+        except Exception as e:
+            logger.debug(f"Satisfaction DM failed for ticket {ticket['id']}: {e}")
+
+        # ── Task 2.5: Schedule channel deletion ──
+        try:
+            closing_embed = discord.Embed(
+                title=i18n.get("tickets.channel_closing", _normalize_lang(ticket.get("staff_language"), "en")),
+                color=discord.Color(COLOR_NOTICE),
+            )
+            await channel.send(embed=style_embed(closing_embed))
+            await asyncio.sleep(10)
+            await channel.delete(reason=f"Ticket #{ticket['id']} closed")
+        except Exception as e:
+            logger.debug(f"Channel deletion failed for ticket {ticket['id']}: {e}")
+
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message):
         if message.author.bot or not message.guild:
@@ -1151,6 +1332,52 @@ class TicketsCog(commands.Cog):
         )
         logger.info(f"Ticket {ticket_id} cree pour {interaction.user.id} sur {interaction.guild.id}")
 
+        # ── Task 5.5: Round-robin auto-assignment ──
+        try:
+            guild_plan = guild_config.get("tier", "free")
+            round_robin_enabled = guild_plan in ("pro", "business") and guild_config.get("round_robin_enabled", 0) == 1
+            if round_robin_enabled and staff_role_id:
+                assigned_staff = self._get_round_robin_staff(interaction.guild, int(staff_role_id))
+                if assigned_staff:
+                    TicketModel.update(
+                        ticket_id,
+                        assigned_staff_id=assigned_staff.id,
+                        assigned_staff_name=assigned_staff.display_name,
+                        status="in_progress"
+                    )
+                    # Update welcome embed with assignment
+                    await self._try_update_welcome_embed(ticket_channel, ticket_id)
+                    # Notify in channel
+                    locale = _normalize_lang(staff_language, "en")
+                    assign_embed = discord.Embed(
+                        title=i18n.get("tickets.auto_assigned_title", locale),
+                        description=i18n.get("tickets.auto_assigned_desc", locale, name=assigned_staff.display_name),
+                        color=discord.Color(COLOR_NOTICE)
+                    )
+                    await ticket_channel.send(embed=style_embed(assign_embed))
+                    logger.info(f"Ticket {ticket_id} auto-assigned to {assigned_staff.id}")
+        except Exception as e:
+            logger.debug(f"Round-robin auto-assignment failed: {e}")
+
+        # ── Task 2.2: Log channel notification on ticket open ──
+        try:
+            log_channel_id = _safe_int(guild_config.get("log_channel_id"))
+            if log_channel_id:
+                log_chan = self.bot.get_channel(log_channel_id) or await self.bot.fetch_channel(log_channel_id)
+                if log_chan:
+                    locale_staff = _normalize_lang(staff_language, "en")
+                    log_embed = discord.Embed(
+                        title=i18n.get("tickets.log_opened_title", locale_staff),
+                        color=discord.Color(COLOR_SUCCESS),
+                    )
+                    log_embed.add_field(name=i18n.get("tickets.log_user", locale_staff), value=f"<@{interaction.user.id}> ({interaction.user.name})", inline=True)
+                    log_embed.add_field(name=i18n.get("tickets.log_channel", locale_staff), value=ticket_channel.mention, inline=True)
+                    log_embed.add_field(name=i18n.get("tickets.log_language", locale_staff), value=f"`{user_language or 'auto'}`", inline=True)
+                    log_embed.add_field(name=i18n.get("tickets.ticket_id", locale_staff), value=f"`{ticket_id}`", inline=True)
+                    await log_chan.send(embed=style_embed(log_embed))
+        except Exception as e:
+            logger.debug(f"Log notification on ticket open failed: {e}")
+
     # ------------------------------------------------------------------
     # /close - fermer le ticket courant
     # ------------------------------------------------------------------
@@ -1489,6 +1716,63 @@ class TicketControlView(discord.ui.View):
             await interaction.response.send_message(embed=style_embed(embed), ephemeral=True, file=file)
         else:
             await interaction.followup.send(embed=style_embed(embed), ephemeral=True, file=file)
+
+
+# ============================================================================
+# Satisfaction Rating View (Task 2.3)
+# ============================================================================
+
+class SatisfactionButton(discord.ui.Button):
+    def __init__(self, rating: int, ticket_id: int, user_id: int, guild_id: int):
+        stars = "⭐" * rating
+        super().__init__(label=stars, style=discord.ButtonStyle.secondary, custom_id=f"sat:{ticket_id}:{rating}")
+        self.rating = rating
+        self.ticket_id = ticket_id
+        self.user_id = user_id
+        self.guild_id = guild_id
+
+    async def callback(self, interaction: discord.Interaction):
+        # Verify the user
+        if interaction.user.id != self.user_id:
+            locale = _normalize_lang(str(interaction.locale), "fr")
+            embed = discord.Embed(
+                title=i18n.get("common.error", locale),
+                description=i18n.get("tickets.not_your_ticket", locale),
+                color=discord.Color(COLOR_WARNING)
+            )
+            style_embed(embed)
+            await interaction.response.send_message(embed=embed, ephemeral=True)
+            return
+
+        # Save rating to DB
+        from bot.db.models import TicketSatisfactionModel
+        TicketSatisfactionModel.upsert(
+            ticket_id=self.ticket_id,
+            user_id=self.user_id,
+            guild_id=self.guild_id,
+            rating=self.rating
+        )
+
+        locale = _normalize_lang(str(interaction.locale), "en")
+        embed = discord.Embed(
+            title=i18n.get("tickets.rating_thanks", locale),
+            description=i18n.get("tickets.rating_saved", locale),
+            color=discord.Color(COLOR_SUCCESS)
+        )
+        style_embed(embed)
+        await interaction.response.edit_message(embed=embed, view=None)
+
+
+class SatisfactionView(discord.ui.View):
+    def __init__(self, ticket_id: int, user_id: int, guild_id: int):
+        super().__init__(timeout=86400)  # 24h timeout
+        self.ticket_id = ticket_id
+        self.user_id = user_id
+        self.guild_id = guild_id
+
+        # Add buttons for ratings 1-5
+        for i in range(1, 6):
+            self.add_item(SatisfactionButton(i, ticket_id, user_id, guild_id))
 
 
 async def setup(bot):
