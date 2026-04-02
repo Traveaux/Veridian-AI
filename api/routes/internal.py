@@ -12,7 +12,8 @@ from bot.db.connection import get_db_context
 from bot.db.models import (
     GuildModel, TicketModel, UserModel, SubscriptionModel,
     OrderModel, PaymentModel, KnowledgeBaseModel, AuditLogModel,
-    BotStatusModel, TicketMessageModel, AuditLogModel, PendingNotificationModel
+    BotStatusModel, TicketMessageModel, AuditLogModel, PendingNotificationModel,
+    ReviewModel
 )
 from bot.config import PLAN_LIMITS, DB_TABLE_PREFIX, DASHBOARD_URL
 from bot.billing import get_plan_limits, get_plan_price, get_public_catalog, normalize_interval, normalize_plan
@@ -1250,4 +1251,106 @@ async def bot_send_dm(req: SendDMRequest):
         return {"status": "ok", "message": "DM queued/sent"}
     except Exception as e:
         logger.error(f"Erreur send_dm: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# Public Reviews API (Task 3.2)
+# ============================================================================
+
+class ReviewCreateBody(BaseModel):
+    user_id: int
+    user_username: str
+    guild_id: Optional[int] = None
+    guild_name: Optional[str] = None
+    rating: int
+    content: str
+
+
+@router.get("/reviews/public")
+def get_public_reviews(limit: int = 20):
+    """
+    Récupère les avis clients approuvés pour affichage public sur le site.
+    Pas d'authentification requise.
+    """
+    try:
+        reviews = ReviewModel.get_public(limit=min(limit, 50))
+        return {"reviews": reviews, "total": len(reviews)}
+    except Exception as e:
+        logger.error(f"Erreur get_public_reviews: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/reviews/submit")
+def submit_review(body: ReviewCreateBody):
+    """
+    Soumet un nouvel avis client (en attente de modération).
+    """
+    try:
+        if not 1 <= body.rating <= 5:
+            raise HTTPException(status_code=400, detail="La note doit être entre 1 et 5")
+        if len(body.content.strip()) < 10:
+            raise HTTPException(status_code=400, detail="L'avis doit contenir au moins 10 caractères")
+        
+        review_id = ReviewModel.create(
+            user_id=body.user_id,
+            user_username=body.user_username,
+            guild_id=body.guild_id,
+            guild_name=body.guild_name,
+            rating=body.rating,
+            content=body.content.strip()
+        )
+        if not review_id:
+            raise HTTPException(status_code=500, detail="Erreur lors de la création de l'avis")
+        
+        return {"status": "success", "review_id": review_id, "message": "Avis soumis et en attente de modération"}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Erreur submit_review: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/reviews/pending", dependencies=[Depends(verify_super_admin)])
+def get_pending_reviews(limit: int = 50):
+    """
+    Liste les avis en attente de modération (admin uniquement).
+    """
+    try:
+        reviews = ReviewModel.list_pending(limit=limit)
+        return {"reviews": reviews, "total": len(reviews)}
+    except Exception as e:
+        logger.error(f"Erreur get_pending_reviews: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/reviews/{review_id}/approve", dependencies=[Depends(verify_super_admin)])
+def approve_review(review_id: int):
+    """
+    Approuve un avis pour affichage public (admin uniquement).
+    """
+    try:
+        success = ReviewModel.approve(review_id, approved=True)
+        if not success:
+            raise HTTPException(status_code=500, detail="Erreur lors de l'approbation")
+        return {"status": "success", "review_id": review_id}
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Erreur approve_review: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/reviews/{review_id}", dependencies=[Depends(verify_super_admin)])
+def delete_review(review_id: int):
+    """
+    Supprime un avis (admin uniquement).
+    """
+    try:
+        success = ReviewModel.delete(review_id)
+        if not success:
+            raise HTTPException(status_code=500, detail="Erreur lors de la suppression")
+        return {"status": "success", "review_id": review_id}
+    except Exception as e:
+        logger.error(f"Erreur delete_review: {e}")
         raise HTTPException(status_code=500, detail=str(e))
