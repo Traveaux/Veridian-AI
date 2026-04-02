@@ -281,6 +281,24 @@
       <p class="section-sub" style="margin:0 auto" data-i18n="section_pricing_sub">Starter, Pro ou Business selon votre volume. -25% en annuel, add-ons disponibles à la carte.</p>
     </div>
 
+    <div class="billing-toggle-container" style="text-align:center;margin:30px 0">
+      <div class="billing-toggle" style="display:inline-flex;align-items:center;gap:16px;background:var(--panel);padding:8px 20px;border-radius:50px;border:1px solid var(--border)">
+        <span class="billing-label" data-i18n="billing_monthly" style="font-size:14px;color:var(--text2)">Mensuel</span>
+        <label class="toggle-switch" style="position:relative;display:inline-block;width:48px;height:24px;cursor:pointer">
+          <input type="checkbox" id="billingToggle" style="opacity:0;width:0;height:0">
+          <span class="toggle-slider" style="position:absolute;top:0;left:0;right:0;bottom:0;background:var(--border2);border-radius:24px;transition:.3s"></span>
+          <span class="toggle-knob" style="position:absolute;height:18px;width:18px;left:3px;bottom:3px;background:var(--text);border-radius:50%;transition:.3s"></span>
+        </label>
+        <span class="billing-label" data-i18n="billing_annual" style="font-size:14px;color:var(--text2)">Annuel</span>
+        <span class="billing-discount" data-i18n="billing_discount" style="font-size:11px;background:var(--accent-dim);color:var(--accent);padding:2px 8px;border-radius:12px;font-weight:600">-25%</span>
+      </div>
+    </div>
+
+    <style>
+      #billingToggle:checked ~ .toggle-slider { background: var(--accent) !important; }
+      #billingToggle:checked ~ .toggle-knob { transform: translateX(24px); background: #000 !important; }
+    </style>
+
     <div class="pricing-grid">
       <!-- Free -->
       <div class="pricing-card reveal reveal-delay-1">
@@ -511,9 +529,6 @@
       </div>
     </div>
   </footer>
-
-  <!-- ── GRID TRACE ── -->
-  <canvas id="grid-trace" style="position:fixed;inset:0;pointer-events:none;z-index:0;"></canvas>
 
   <script src="js/main.js"></script>
 </body>
