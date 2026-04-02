@@ -16,6 +16,8 @@
   --accent-dim:   rgba(45,255,143,0.10);
   --accent-dim2:  rgba(45,255,143,0.06);
   --accent-glow:  rgba(45,255,143,0.22);
+  --green-dark:   #00a652;
+  --green-dark-dim: rgba(0,166,82,0.15);
   --text:         #e4f0e8;
   --text2:        #7a9e87;
   --text3:        #3f5c48;
@@ -458,7 +460,7 @@ body::before {
 .stat-card.c-green::after { background: var(--accent); }
 .stat-card.c-red::after   { background: var(--red); }
 .stat-card.c-yellow::after{ background: var(--yellow); }
-.stat-card.c-blue::after  { background: var(--blue); }
+.stat-card.c-blue::after  { background: var(--green-dark); }
 .stat-card:hover { border-color: var(--border2); transform: translateY(-2px); }
 
 .stat-top {
@@ -493,7 +495,7 @@ body::before {
 .stat-icon.c-green { background: var(--accent-dim); color: var(--accent); border-color: rgba(45,255,143,0.14); }
 .stat-icon.c-red   { background: var(--red-dim); color: var(--red); border-color: rgba(255,77,109,0.14); }
 .stat-icon.c-yellow{ background: var(--yellow-dim); color: var(--yellow); border-color: rgba(255,201,77,0.14); }
-.stat-icon.c-blue  { background: var(--blue-dim); color: var(--blue); border-color: rgba(45, 255, 143, 0.14); }
+.stat-icon.c-blue  { background: var(--green-dark-dim); color: var(--green-dark); border-color: rgba(0,166,82,0.14); }
 
 .stat-value {
   font-family: 'Space Mono', monospace;

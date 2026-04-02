@@ -834,7 +834,7 @@
                 <div class="settings-subcard-header">
                   <div>
                     <div class="settings-subcard-title">Règles d'exploitation</div>
-                    <div class="settings-subcard-desc">Même options qu'avant, mais regroupées pour garder la section lisible.</div>
+                    <div class="settings-subcard-desc">Configurez les limites et restrictions pour maintenir la qualité du support.</div>
                   </div>
                 </div>
                 <div class="toggle-row">
@@ -1071,6 +1071,70 @@
       </div>
     </div>
 
+    <!-- ══ ANALYTICS PAGE ════════════════════════════════════════════════════ -->
+    <div class="page-content" id="page-analytics" style="display:none">
+      <div class="page-header">
+        <div>
+          <div class="page-title" data-i18n="dash_analytics">Analytics</div>
+          <div class="page-sub" data-i18n="dash_analytics_sub">KPIs et métriques détaillées</div>
+        </div>
+        <div class="page-actions">
+          <select class="form-select" id="analytics-period" style="width:140px;font-size:12px">
+            <option value="7" data-i18n="analytics_7days">7 derniers jours</option>
+            <option value="30" data-i18n="analytics_30days">30 derniers jours</option>
+            <option value="90" data-i18n="analytics_90days">3 derniers mois</option>
+          </select>
+        </div>
+      </div>
+      
+      <!-- KPI Cards Row -->
+      <div class="stats-row" id="analytics-kpi-row">
+        <div class="stat-card c-green">
+          <div class="stat-top"><div class="stat-label" data-i18n="analytics_first_response">Première réponse</div></div>
+          <div class="stat-value" id="kpi-first-response">—</div>
+          <div class="stat-delta" data-i18n="analytics_avg_time">Temps moyen</div>
+        </div>
+        <div class="stat-card c-green-dark">
+          <div class="stat-top"><div class="stat-label" data-i18n="analytics_resolution_time">Résolution</div></div>
+          <div class="stat-value" id="kpi-resolution">—</div>
+          <div class="stat-delta" data-i18n="avg_resolution">Temps moyen</div>
+        </div>
+        <div class="stat-card c-yellow">
+          <div class="stat-top"><div class="stat-label" data-i18n="analytics_satisfaction">Satisfaction</div></div>
+          <div class="stat-value" id="kpi-satisfaction">—</div>
+          <div class="stat-delta" data-i18n="analytics_rating">Note moyenne</div>
+        </div>
+        <div class="stat-card c-red">
+          <div class="stat-top"><div class="stat-label" data-i18n="analytics_sla_compliance">SLA</div></div>
+          <div class="stat-value" id="kpi-sla">—</div>
+          <div class="stat-delta" data-i18n="analytics_within_sla">Dans les délais</div>
+        </div>
+      </div>
+      
+      <!-- Agent Leaderboard -->
+      <div class="card" style="margin-top:20px">
+        <div class="card-header">
+          <div class="card-title"><div class="card-dot"></div><span data-i18n="analytics_leaderboard">Leaderboard Agents</span></div>
+        </div>
+        <div class="card-body">
+          <table class="data-table" id="analytics-leaderboard">
+            <thead>
+              <tr>
+                <th data-i18n="analytics_rank">#</th>
+                <th data-i18n="analytics_agent">Agent</th>
+                <th data-i18n="analytics_tickets_handled">Tickets</th>
+                <th data-i18n="analytics_avg_response">Temps réponse</th>
+                <th data-i18n="analytics_rating">Note</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr><td colspan="5" style="text-align:center;padding:24px;color:var(--text3)" data-i18n="dash_loading">Chargement…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
   </div><!-- .main -->
 </div><!-- .app -->
 
@@ -1251,71 +1315,6 @@ Un agent va prendre en charge votre demande. Vous pouvez décrire votre problèm
         <button class="btn btn-ghost btn-sm" id="drawer-close-ticket" data-i18n="ticket_close">Fermer</button>
         <button class="btn btn-ghost btn-sm" id="drawer-view-channel" data-i18n="ticket_view_channel">Voir le channel</button>
       </div>
-    </div>
-  </div>
-</div>
-
-<!-- ══ ANALYTICS PAGE ENHANCEMENT (Task 7.1) ═════════════════════════════════ -->
-<!-- Page Analytics cachée par défaut, affichée via navigation -->
-<div class="page-content" id="page-analytics" style="display:none">
-  <div class="page-header">
-    <div>
-      <div class="page-title" data-i18n="dash_analytics">Analytics</div>
-      <div class="page-sub" data-i18n="dash_analytics_sub">KPIs et métriques détaillées</div>
-    </div>
-    <div class="page-actions">
-      <select class="form-select" id="analytics-period" style="width:140px;font-size:12px">
-        <option value="7" data-i18n="analytics_7days">7 derniers jours</option>
-        <option value="30" data-i18n="analytics_30days">30 derniers jours</option>
-        <option value="90" data-i18n="analytics_90days">3 derniers mois</option>
-      </select>
-    </div>
-  </div>
-  
-  <!-- KPI Cards Row -->
-  <div class="stats-row" id="analytics-kpi-row">
-    <div class="stat-card c-green">
-      <div class="stat-top"><div class="stat-label" data-i18n="analytics_first_response">Première réponse</div></div>
-      <div class="stat-value" id="kpi-first-response">—</div>
-      <div class="stat-delta" data-i18n="analytics_avg_time">Temps moyen</div>
-    </div>
-    <div class="stat-card c-blue">
-      <div class="stat-top"><div class="stat-label" data-i18n="analytics_resolution_time">Résolution</div></div>
-      <div class="stat-value" id="kpi-resolution">—</div>
-      <div class="stat-delta" data-i18n="avg_resolution">Temps moyen</div>
-    </div>
-    <div class="stat-card c-yellow">
-      <div class="stat-top"><div class="stat-label" data-i18n="analytics_satisfaction">Satisfaction</div></div>
-      <div class="stat-value" id="kpi-satisfaction">—</div>
-      <div class="stat-delta" data-i18n="analytics_rating">Note moyenne</div>
-    </div>
-    <div class="stat-card c-red">
-      <div class="stat-top"><div class="stat-label" data-i18n="analytics_sla_compliance">SLA</div></div>
-      <div class="stat-value" id="kpi-sla">—</div>
-      <div class="stat-delta" data-i18n="analytics_within_sla">Dans les délais</div>
-    </div>
-  </div>
-  
-  <!-- Agent Leaderboard -->
-  <div class="card" style="margin-top:20px">
-    <div class="card-header">
-      <div class="card-title"><div class="card-dot"></div><span data-i18n="analytics_leaderboard">Leaderboard Agents</span></div>
-    </div>
-    <div class="card-body">
-      <table class="data-table" id="analytics-leaderboard">
-        <thead>
-          <tr>
-            <th data-i18n="analytics_rank">#</th>
-            <th data-i18n="analytics_agent">Agent</th>
-            <th data-i18n="analytics_tickets_handled">Tickets</th>
-            <th data-i18n="analytics_avg_response">Temps réponse</th>
-            <th data-i18n="analytics_rating">Note</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr><td colspan="5" style="text-align:center;padding:24px;color:var(--text3)" data-i18n="dash_loading">Chargement…</td></tr>
-        </tbody>
-      </table>
     </div>
   </div>
 </div>
