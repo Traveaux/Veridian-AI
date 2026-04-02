@@ -925,8 +925,8 @@ body::before {
 
 .billing-modal-tab.active {
   color: var(--text);
-  border-color: rgba(77, 166, 255, 0.4);
-  background: rgba(77, 166, 255, 0.12);
+  border-color: rgba(45, 255, 143, 0.35);
+  background: var(--accent-dim);
 }
 
 .billing-modal-body {
@@ -1087,13 +1087,13 @@ body::before {
 
 .billing-choice:hover {
   transform: translateY(-1px);
-  border-color: rgba(77, 166, 255, 0.28);
+  border-color: rgba(45, 255, 143, 0.28);
 }
 
 .billing-choice.active {
-  border-color: rgba(77, 166, 255, 0.45);
-  background: rgba(77, 166, 255, 0.1);
-  box-shadow: 0 0 0 1px rgba(77, 166, 255, 0.14) inset;
+  border-color: rgba(45, 255, 143, 0.4);
+  background: rgba(45, 255, 143, 0.08);
+  box-shadow: 0 0 0 1px rgba(45, 255, 143, 0.12) inset;
 }
 
 .billing-choice-title {
@@ -1116,8 +1116,8 @@ body::before {
 }
 
 .billing-purchase-feedback {
-  border: 1px solid rgba(77, 166, 255, 0.22);
-  background: rgba(77, 166, 255, 0.08);
+  border: 1px solid rgba(45, 255, 143, 0.22);
+  background: rgba(45, 255, 143, 0.08);
   border-radius: 12px;
   padding: 14px;
 }

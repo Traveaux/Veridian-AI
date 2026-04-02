@@ -195,6 +195,14 @@
         </svg>
         <span data-i18n="dash_kb">Knowledge Base</span>
       </div>
+      <div class="nav-item" data-page="analytics">
+        <svg class="nav-icon" viewBox="0 0 14 14" fill="none">
+          <rect x="1" y="8" width="3" height="5" rx=".5" fill="currentColor" opacity=".6"/>
+          <rect x="5.5" y="4" width="3" height="9" rx=".5" fill="currentColor" opacity=".8"/>
+          <rect x="10" y="1" width="3" height="12" rx=".5" fill="currentColor"/>
+        </svg>
+        <span data-i18n="dash_analytics">Analytics</span>
+      </div>
     </div>
 
     <div class="nav-sep"></div>
@@ -1065,6 +1073,252 @@
 
   </div><!-- .main -->
 </div><!-- .app -->
+
+<!-- ══ ONBOARDING WIZARD (Task 6.1) ════════════════════════════════════════ -->
+<div id="onboarding-wizard" style="display:none;position:fixed;inset:0;z-index:20000;background:rgba(0,0,0,.85);backdrop-filter:blur(8px);align-items:center;justify-content:center">
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:16px;width:min(560px,90vw);max-height:85vh;display:flex;flex-direction:column;overflow:hidden">
+    <div style="padding:24px 28px 20px;border-bottom:1px solid var(--border);background:linear-gradient(135deg,var(--bg2) 0%,var(--panel) 100%)">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">
+        <div style="width:40px;height:40px;background:var(--accent);border-radius:10px;display:flex;align-items:center;justify-content:center;color:#000">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <path d="M12 2L2 7l10 5 10-5-10-5z"/>
+            <path d="M2 17l10 5 10-5"/>
+            <path d="M2 12l10 5 10-5"/>
+          </svg>
+        </div>
+        <div>
+          <div style="font-size:16px;font-weight:700;color:var(--text)" data-i18n="onboarding_title">Configuration rapide</div>
+          <div style="font-size:12px;color:var(--text2)" data-i18n="onboarding_subtitle">4 étapes pour configurer Veridian AI</div>
+        </div>
+      </div>
+      <div style="display:flex;gap:6px;margin-top:16px">
+        <div class="wizard-step-dot active" data-step="1" style="flex:1;height:4px;background:var(--accent);border-radius:2px;transition:all .3s"></div>
+        <div class="wizard-step-dot" data-step="2" style="flex:1;height:4px;background:var(--border2);border-radius:2px;transition:all .3s"></div>
+        <div class="wizard-step-dot" data-step="3" style="flex:1;height:4px;background:var(--border2);border-radius:2px;transition:all .3s"></div>
+        <div class="wizard-step-dot" data-step="4" style="flex:1;height:4px;background:var(--border2);border-radius:2px;transition:all .3s"></div>
+      </div>
+    </div>
+    
+    <div id="wizard-content" style="padding:28px;overflow-y:auto;flex:1">
+      <!-- Step 1: Server Selection -->
+      <div class="wizard-step" data-step="1">
+        <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:12px" data-i18n="onboarding_step1_title">1. Sélectionnez votre serveur</div>
+        <p style="font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:20px" data-i18n="onboarding_step1_desc">Veridian AI fonctionne sur vos serveurs Discord où vous avez les permissions administrateur.</p>
+        <div id="wizard-server-list" style="display:flex;flex-direction:column;gap:8px">
+          <!-- Peuplé dynamiquement -->
+          <div style="padding:16px;background:var(--panel);border:1px solid var(--border);border-radius:8px;text-align:center;color:var(--text3);font-size:13px" data-i18n="onboarding_loading_servers">Chargement de vos serveurs…</div>
+        </div>
+      </div>
+      
+      <!-- Step 2: Channel Configuration -->
+      <div class="wizard-step" data-step="2" style="display:none">
+        <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:12px" data-i18n="onboarding_step2_title">2. Configurez les channels</div>
+        <p style="font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:20px" data-i18n="onboarding_step2_desc">Définissez où les tickets seront créés et où le staff recevra les notifications.</p>
+        <div style="display:flex;flex-direction:column;gap:16px">
+          <div class="form-group">
+            <label class="form-label" data-i18n="onboarding_ticket_category">Catégorie pour les tickets</label>
+            <input class="form-input" id="wizard-category" type="text" placeholder="ID de la catégorie Discord">
+            <div style="font-size:11px;color:var(--text3);margin-top:4px" data-i18n="onboarding_category_help">Clique droit sur la catégorie → Copier l'identifiant</div>
+          </div>
+          <div class="form-group">
+            <label class="form-label" data-i18n="onboarding_staff_role">Rôle Staff</label>
+            <input class="form-input" id="wizard-staff-role" type="text" placeholder="@NomDuRole ou ID">
+          </div>
+          <div class="form-group">
+            <label class="form-label" data-i18n="onboarding_logs_channel">Channel de logs (optionnel)</label>
+            <input class="form-input" id="wizard-logs" type="text" placeholder="#logs ou ID">
+          </div>
+        </div>
+      </div>
+      
+      <!-- Step 3: Welcome Message -->
+      <div class="wizard-step" data-step="3" style="display:none">
+        <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:12px" data-i18n="onboarding_step3_title">3. Personnalisez le message de bienvenue</div>
+        <p style="font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:20px" data-i18n="onboarding_step3_desc">Ce message sera affiché quand un utilisateur ouvre un ticket.</p>
+        <div class="form-group">
+          <label class="form-label" data-i18n="onboarding_welcome_message">Message de bienvenue</label>
+          <textarea class="form-input" id="wizard-welcome" rows="4" placeholder="Bienvenue {user_mention}! Un agent va prendre en charge votre demande.">Bienvenue {user_mention}! 
+
+Un agent va prendre en charge votre demande. Vous pouvez décrire votre problème dans n'importe quelle langue, nous traduirons automatiquement.</textarea>
+          <div style="font-size:11px;color:var(--text3);margin-top:6px" data-i18n="onboarding_variables">Variables: {user_mention}, {ticket_id}, {user_language}</div>
+        </div>
+        <div style="margin-top:16px;padding:12px;background:var(--panel);border-radius:8px;border-left:3px solid var(--accent)">
+          <div style="font-size:12px;color:var(--text2)" data-i18n="onboarding_preview_hint">Aperçu du rendu dans Discord</div>
+        </div>
+      </div>
+      
+      <!-- Step 4: Summary -->
+      <div class="wizard-step" data-step="4" style="display:none">
+        <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:12px" data-i18n="onboarding_step4_title">4. Récapitulatif</div>
+        <p style="font-size:13px;color:var(--text2);line-height:1.6;margin-bottom:20px" data-i18n="onboarding_step4_desc">Vérifiez votre configuration avant de l'activer.</p>
+        <div id="wizard-summary" style="background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:16px;font-size:13px;line-height:1.8;color:var(--text2)">
+          <!-- Peuplé dynamiquement -->
+        </div>
+        <div style="margin-top:16px;padding:12px;background:var(--accent-dim);border-radius:8px">
+          <div style="font-size:12px;color:var(--accent);font-weight:500" data-i18n="onboarding_ready">Veridian AI est prêt à être activé sur votre serveur !</div>
+        </div>
+      </div>
+    </div>
+    
+    <div style="padding:20px 28px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;background:var(--panel)">
+      <button class="btn btn-ghost btn-sm" id="wizard-skip" data-i18n="onboarding_skip">Passer</button>
+      <div style="display:flex;gap:10px">
+        <button class="btn btn-ghost btn-sm" id="wizard-prev" style="display:none" data-i18n="onboarding_back">Retour</button>
+        <button class="btn btn-primary btn-sm" id="wizard-next" data-i18n="onboarding_continue">Continuer</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ COMMAND PALETTE (Task 6.2) ═════════════════════════════════════════ -->
+<div id="command-palette" style="display:none;position:fixed;inset:0;z-index:15000;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);align-items:flex-start;justify-content:center;padding-top:15vh">
+  <div style="background:var(--bg2);border:1px solid var(--border);border-radius:12px;width:min(600px,90vw);max-height:60vh;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 25px 50px rgba(0,0,0,.5)">
+    <div style="padding:16px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:12px">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--text3)">
+        <circle cx="11" cy="11" r="8"/>
+        <path d="M21 21l-4.35-4.35"/>
+      </svg>
+      <input id="command-input" type="text" placeholder="Rechercher une commande... (ex: ticket, settings, logout)" data-i18n-placeholder="command_palette_placeholder" 
+        style="flex:1;background:none;border:none;color:var(--text);font-size:14px;outline:none" autocomplete="off">
+      <kbd style="padding:4px 8px;background:var(--panel);border:1px solid var(--border);border-radius:4px;font-size:11px;color:var(--text3);font-family:'Space Mono',monospace">ESC</kbd>
+    </div>
+    <div id="command-results" style="overflow-y:auto;max-height:calc(60vh - 60px)">
+      <!-- Peuplé dynamiquement -->
+    </div>
+    <div style="padding:8px 16px;border-top:1px solid var(--border);background:var(--panel);display:flex;gap:16px;font-size:11px;color:var(--text3)">
+      <span><kbd>↑↓</kbd> <span data-i18n="command_navigate">naviguer</span></span>
+      <span><kbd>Enter</kbd> <span data-i18n="command_select">sélectionner</span></span>
+      <span style="margin-left:auto"><kbd>Ctrl</kbd>+<kbd>K</kbd> <span data-i18n="command_open">ouvrir</span></span>
+    </div>
+  </div>
+</div>
+
+<!-- ══ TICKET DETAIL DRAWER (Task 6.3) ═══════════════════════════════════════ -->
+<div id="ticket-drawer" style="display:none;position:fixed;top:0;right:0;bottom:0;z-index:12000;background:var(--bg2);border-left:1px solid var(--border);width:min(480px,90vw);transform:translateX(100%);transition:transform .3s ease;box-shadow:-10px 0 40px rgba(0,0,0,.4)">
+  <div style="display:flex;flex-direction:column;height:100%">
+    <div style="padding:20px 24px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;background:var(--panel)">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="padding:6px 10px;background:var(--accent-dim);border-radius:6px;color:var(--accent);font-family:'Space Mono',monospace;font-size:12px;font-weight:600" id="drawer-ticket-id">#—</div>
+        <span id="drawer-ticket-status" class="pill pending">—</span>
+      </div>
+      <button id="drawer-close" style="background:none;border:none;color:var(--text3);cursor:pointer;padding:4px" aria-label="Fermer">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M18 6L6 18"/><path d="M6 6l12 12"/>
+        </svg>
+      </button>
+    </div>
+    
+    <div style="flex:1;overflow-y:auto;padding:24px">
+      <div style="margin-bottom:24px">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text3);margin-bottom:8px" data-i18n="ticket_user">Utilisateur</div>
+        <div style="display:flex;align-items:center;gap:12px">
+          <div id="drawer-user-avatar" style="width:40px;height:40px;background:var(--accent);border-radius:50%;display:flex;align-items:center;justify-content:center;color:#000;font-weight:600;font-size:16px">?</div>
+          <div>
+            <div id="drawer-user-name" style="font-size:14px;font-weight:600;color:var(--text)">—</div>
+            <div id="drawer-user-lang" style="font-size:12px;color:var(--text2)">Langue: —</div>
+          </div>
+        </div>
+      </div>
+      
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px">
+        <div style="padding:12px;background:var(--panel);border-radius:8px">
+          <div style="font-size:11px;color:var(--text3);margin-bottom:4px" data-i18n="ticket_opened">Ouvert le</div>
+          <div id="drawer-opened-at" style="font-size:13px;color:var(--text);font-weight:500">—</div>
+        </div>
+        <div style="padding:12px;background:var(--panel);border-radius:8px">
+          <div style="font-size:11px;color:var(--text3);margin-bottom:4px" data-i18n="ticket_priority">Priorité</div>
+          <div id="drawer-priority" style="font-size:13px;color:var(--text);font-weight:500">—</div>
+        </div>
+      </div>
+      
+      <div style="margin-bottom:24px">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text3);margin-bottom:8px" data-i18n="ticket_assigned">Assigné à</div>
+        <div id="drawer-assigned" style="display:flex;align-items:center;gap:8px;padding:10px 12px;background:var(--panel);border-radius:8px;font-size:13px;color:var(--text)">
+          <span data-i18n="ticket_not_assigned">Non assigné</span>
+        </div>
+      </div>
+      
+      <div style="margin-bottom:24px">
+        <div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--text3);margin-bottom:12px" data-i18n="ticket_transcript">Transcription</div>
+        <div id="drawer-transcript" style="padding:16px;background:var(--panel);border-radius:8px;font-size:12px;line-height:1.7;color:var(--text2);font-family:'Space Mono',monospace;max-height:200px;overflow-y:auto;white-space:pre-wrap">
+          —
+        </div>
+      </div>
+      
+      <!-- Actions rapides -->
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <button class="btn btn-primary btn-sm" id="drawer-take" data-i18n="ticket_take">Prendre le ticket</button>
+        <button class="btn btn-ghost btn-sm" id="drawer-close-ticket" data-i18n="ticket_close">Fermer</button>
+        <button class="btn btn-ghost btn-sm" id="drawer-view-channel" data-i18n="ticket_view_channel">Voir le channel</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══ ANALYTICS PAGE ENHANCEMENT (Task 7.1) ═════════════════════════════════ -->
+<!-- Page Analytics cachée par défaut, affichée via navigation -->
+<div class="page-content" id="page-analytics" style="display:none">
+  <div class="page-header">
+    <div>
+      <div class="page-title" data-i18n="dash_analytics">Analytics</div>
+      <div class="page-sub" data-i18n="dash_analytics_sub">KPIs et métriques détaillées</div>
+    </div>
+    <div class="page-actions">
+      <select class="form-select" id="analytics-period" style="width:140px;font-size:12px">
+        <option value="7" data-i18n="analytics_7days">7 derniers jours</option>
+        <option value="30" data-i18n="analytics_30days">30 derniers jours</option>
+        <option value="90" data-i18n="analytics_90days">3 derniers mois</option>
+      </select>
+    </div>
+  </div>
+  
+  <!-- KPI Cards Row -->
+  <div class="stats-row" id="analytics-kpi-row">
+    <div class="stat-card c-green">
+      <div class="stat-top"><div class="stat-label" data-i18n="analytics_first_response">Première réponse</div></div>
+      <div class="stat-value" id="kpi-first-response">—</div>
+      <div class="stat-delta" data-i18n="analytics_avg_time">Temps moyen</div>
+    </div>
+    <div class="stat-card c-blue">
+      <div class="stat-top"><div class="stat-label" data-i18n="analytics_resolution_time">Résolution</div></div>
+      <div class="stat-value" id="kpi-resolution">—</div>
+      <div class="stat-delta" data-i18n="avg_resolution">Temps moyen</div>
+    </div>
+    <div class="stat-card c-yellow">
+      <div class="stat-top"><div class="stat-label" data-i18n="analytics_satisfaction">Satisfaction</div></div>
+      <div class="stat-value" id="kpi-satisfaction">—</div>
+      <div class="stat-delta" data-i18n="analytics_rating">Note moyenne</div>
+    </div>
+    <div class="stat-card c-red">
+      <div class="stat-top"><div class="stat-label" data-i18n="analytics_sla_compliance">SLA</div></div>
+      <div class="stat-value" id="kpi-sla">—</div>
+      <div class="stat-delta" data-i18n="analytics_within_sla">Dans les délais</div>
+    </div>
+  </div>
+  
+  <!-- Agent Leaderboard -->
+  <div class="card" style="margin-top:20px">
+    <div class="card-header">
+      <div class="card-title"><div class="card-dot"></div><span data-i18n="analytics_leaderboard">Leaderboard Agents</span></div>
+    </div>
+    <div class="card-body">
+      <table class="data-table" id="analytics-leaderboard">
+        <thead>
+          <tr>
+            <th data-i18n="analytics_rank">#</th>
+            <th data-i18n="analytics_agent">Agent</th>
+            <th data-i18n="analytics_tickets_handled">Tickets</th>
+            <th data-i18n="analytics_avg_response">Temps réponse</th>
+            <th data-i18n="analytics_rating">Note</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td colspan="5" style="text-align:center;padding:24px;color:var(--text3)" data-i18n="dash_loading">Chargement…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
 
   <!-- Inline scripts removed: blocked by strict CSP (script-src 'self'). -->
 
