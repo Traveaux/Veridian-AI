@@ -559,6 +559,155 @@ CREATE TABLE IF NOT EXISTS vai_pending_notifications (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================================
+-- VAI_PENDING_ACTIONS - File d'attente des actions differees (Task 2.4)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS vai_pending_actions (
+    id                  INT AUTO_INCREMENT PRIMARY KEY,
+    guild_id            BIGINT          NOT NULL        COMMENT 'Discord Guild ID',
+    channel_id          BIGINT          NOT NULL        COMMENT 'Discord Channel ID a supprimer',
+    action              VARCHAR(50)     DEFAULT 'delete_channel' COMMENT 'Type d action',
+    execute_after       TIMESTAMP       NOT NULL        COMMENT 'Executer apres cette date',
+    attempts            INT             DEFAULT 0       COMMENT 'Nombre de tentatives',
+    created_at          TIMESTAMP       DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_guild       (guild_id),
+    KEY idx_execute     (execute_after),
+    KEY idx_attempts    (attempts)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
+-- VAI_TICKET_SATISFACTION - Satisfaction des tickets (Task 2.3)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS vai_ticket_satisfaction (
+    id              INT AUTO_INCREMENT PRIMARY KEY,
+    ticket_id       INT             NOT NULL        COMMENT 'ID du ticket',
+    user_id         BIGINT          NOT NULL        COMMENT 'Discord User ID',
+    guild_id        BIGINT                          COMMENT 'Discord Guild ID',
+    rating          TINYINT         NOT NULL        COMMENT 'Note 1-5',
+    comment         TEXT                            COMMENT 'Commentaire optionnel',
+    created_at      TIMESTAMP       DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_ticket_user (ticket_id, user_id),
+    KEY idx_ticket  (ticket_id),
+    KEY idx_user    (user_id),
+    KEY idx_guild   (guild_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
+-- VAI_REVIEWS - Avis clients (Task 3.1)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS vai_reviews (
+    id              INT AUTO_INCREMENT PRIMARY KEY,
+    user_id         BIGINT          NOT NULL        COMMENT 'Discord User ID',
+    user_username   VARCHAR(100)                    COMMENT 'Nom utilisateur au moment de l avis',
+    guild_id        BIGINT                          COMMENT 'Discord Guild ID',
+    guild_name      VARCHAR(100)                    COMMENT 'Nom du serveur',
+    rating          TINYINT         NOT NULL        COMMENT 'Note 1-5',
+    content         TEXT            NOT NULL        COMMENT 'Texte de l avis',
+    is_approved     TINYINT(1)      DEFAULT 0       COMMENT 'Approuve par admin avant affichage',
+    is_visible      TINYINT(1)      DEFAULT 1       COMMENT 'Visible sur le site',
+    created_at      TIMESTAMP       DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_visible (is_visible),
+    KEY idx_approved (is_approved),
+    KEY idx_user    (user_id),
+    KEY idx_guild   (guild_id),
+    KEY idx_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
+-- VAI_TICKET_TAGS - Tags/labels sur les tickets (Task 5.1)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS vai_ticket_tags (
+    id          INT AUTO_INCREMENT PRIMARY KEY,
+    guild_id    BIGINT          NOT NULL        COMMENT 'Discord Guild ID',
+    label       VARCHAR(50)     NOT NULL        COMMENT 'Nom du tag',
+    color       VARCHAR(10)     DEFAULT '#2DFF8F' COMMENT 'Couleur hex du tag',
+    emoji       VARCHAR(20)                     COMMENT 'Emoji optionnel',
+    is_active   TINYINT(1)      DEFAULT 1       COMMENT 'Tag actif',
+    created_at  TIMESTAMP       DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_guild_label (guild_id, label),
+    KEY idx_guild (guild_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS vai_ticket_tag_links (
+    ticket_id   INT             NOT NULL        COMMENT 'ID du ticket',
+    tag_id      INT             NOT NULL        COMMENT 'ID du tag',
+    added_at    TIMESTAMP       DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (ticket_id, tag_id),
+    FOREIGN KEY (ticket_id) REFERENCES vai_tickets(id) ON DELETE CASCADE,
+    FOREIGN KEY (tag_id) REFERENCES vai_ticket_tags(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
+-- VAI_TICKET_NOTES - Notes internes staff (Task 5.2)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS vai_ticket_notes (
+    id              INT AUTO_INCREMENT PRIMARY KEY,
+    ticket_id       INT             NOT NULL        COMMENT 'ID du ticket',
+    author_id       BIGINT          NOT NULL        COMMENT 'Discord User ID du staff',
+    author_username VARCHAR(100)                    COMMENT 'Nom du staff',
+    content         TEXT            NOT NULL        COMMENT 'Contenu de la note',
+    created_at      TIMESTAMP       DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_ticket  (ticket_id),
+    KEY idx_author  (author_id),
+    FOREIGN KEY (ticket_id) REFERENCES vai_tickets(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
+-- VAI_SNIPPETS - Reponses predefinies (Task 5.3)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS vai_snippets (
+    id              INT AUTO_INCREMENT PRIMARY KEY,
+    guild_id        BIGINT          NOT NULL        COMMENT 'Discord Guild ID',
+    trigger         VARCHAR(50)     NOT NULL        COMMENT 'Mot-cle declencheur ex: bonjour',
+    content         TEXT            NOT NULL        COMMENT 'Contenu de la reponse',
+    language        VARCHAR(10)     DEFAULT 'fr'    COMMENT 'Langue du snippet',
+    auto_translate  TINYINT(1)      DEFAULT 1       COMMENT 'Traduire automatiquement',
+    created_at      TIMESTAMP       DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_guild_trigger (guild_id, trigger),
+    KEY idx_guild   (guild_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
+-- VAI_BLACKLIST - Liste noire utilisateurs (Task 5.4)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS vai_blacklist (
+    id          INT AUTO_INCREMENT PRIMARY KEY,
+    guild_id    BIGINT          NOT NULL        COMMENT 'Discord Guild ID',
+    user_id     BIGINT          NOT NULL        COMMENT 'Discord User ID',
+    reason      TEXT                            COMMENT 'Raison du blacklist',
+    added_by    BIGINT                          COMMENT 'Discord User ID du modérateur',
+    expires_at  TIMESTAMP       NULL            COMMENT 'Expiration (NULL = permanent)',
+    created_at  TIMESTAMP       DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_guild_user (guild_id, user_id),
+    KEY idx_guild   (guild_id),
+    KEY idx_user    (user_id),
+    KEY idx_expires (expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
+-- VAI_OUTBOUND_WEBHOOKS - Webhooks sortants (Task 9.1)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS vai_outbound_webhooks (
+    id          INT AUTO_INCREMENT PRIMARY KEY,
+    guild_id    BIGINT          NOT NULL        COMMENT 'Discord Guild ID',
+    url         VARCHAR(500)    NOT NULL        COMMENT 'URL du webhook',
+    secret      VARCHAR(100)                    COMMENT 'Secret pour signature HMAC',
+    events      JSON                            COMMENT 'Liste d evenements [ticket.open, ticket.close]',
+    is_active   TINYINT(1)      DEFAULT 1       COMMENT 'Webhook actif',
+    last_status INT                             COMMENT 'Dernier code HTTP',
+    created_at  TIMESTAMP       DEFAULT CURRENT_TIMESTAMP,
+    KEY idx_guild   (guild_id),
+    KEY idx_active  (is_active)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
 -- Migration depuis v0.2 (si la DB existe deja)
 -- CREATE TABLE IF NOT EXISTS vai_temp_codes (...) -- voir ci-dessus
 -- ============================================================================

@@ -1735,3 +1735,505 @@ class BillingWebhookEventModel:
                 return True
             except Exception:
                 return False
+
+
+# ============================================================================
+# VAI_PENDING_ACTIONS
+# ============================================================================
+
+class PendingActionModel:
+    """Queue for deferred actions (e.g. channel deletions after ticket close)."""
+
+    @staticmethod
+    def create(guild_id: int, channel_id: int, action: str = "delete_channel",
+               execute_after_seconds: int = 10) -> Optional[int]:
+        with get_db_context() as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    f"""
+                    INSERT INTO {DB_TABLE_PREFIX}pending_actions
+                    (guild_id, channel_id, action, execute_after)
+                    VALUES (%s, %s, %s, DATE_ADD(NOW(), INTERVAL %s SECOND))
+                    """,
+                    (guild_id, channel_id, action, execute_after_seconds),
+                )
+                return cursor.lastrowid
+            except Exception as e:
+                logger.error(f"Erreur creation pending action: {e}")
+                return None
+
+    @staticmethod
+    def list_ready(limit: int = 20) -> List[Dict]:
+        with get_db_context() as conn:
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute(
+                f"""
+                SELECT * FROM {DB_TABLE_PREFIX}pending_actions
+                WHERE execute_after <= NOW()
+                ORDER BY execute_after ASC
+                LIMIT %s
+                """,
+                (limit,),
+            )
+            return cursor.fetchall()
+
+    @staticmethod
+    def delete(action_id: int) -> bool:
+        with get_db_context() as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    f"DELETE FROM {DB_TABLE_PREFIX}pending_actions WHERE id = %s",
+                    (action_id,),
+                )
+                return True
+            except Exception:
+                return False
+
+
+# ============================================================================
+# VAI_TICKET_SATISFACTION
+# ============================================================================
+
+class TicketSatisfactionModel:
+    """Stores satisfaction ratings for closed tickets."""
+
+    @staticmethod
+    def upsert(ticket_id: int, user_id: int, guild_id: int, rating: int,
+               comment: str = None) -> bool:
+        with get_db_context() as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    f"""
+                    INSERT INTO {DB_TABLE_PREFIX}ticket_satisfaction
+                    (ticket_id, user_id, guild_id, rating, comment)
+                    VALUES (%s, %s, %s, %s, %s)
+                    ON DUPLICATE KEY UPDATE rating = VALUES(rating), comment = VALUES(comment)
+                    """,
+                    (ticket_id, user_id, guild_id, rating, comment),
+                )
+                return True
+            except Exception as e:
+                logger.error(f"Erreur upsert satisfaction: {e}")
+                return False
+
+    @staticmethod
+    def get_by_ticket(ticket_id: int) -> Optional[Dict]:
+        with get_db_context() as conn:
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute(
+                f"SELECT * FROM {DB_TABLE_PREFIX}ticket_satisfaction WHERE ticket_id = %s",
+                (ticket_id,),
+            )
+            return cursor.fetchone()
+
+    @staticmethod
+    def average_by_guild(guild_id: int) -> Optional[float]:
+        with get_db_context() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"SELECT AVG(rating) FROM {DB_TABLE_PREFIX}ticket_satisfaction WHERE guild_id = %s",
+                (guild_id,),
+            )
+            result = cursor.fetchone()
+            return float(result[0]) if result and result[0] is not None else None
+
+
+# ============================================================================
+# VAI_REVIEWS (Task 3.1/3.2)
+# ============================================================================
+
+class ReviewModel:
+    """Avis clients pour affichage sur le site."""
+
+    @staticmethod
+    def create(user_id: int, user_username: str, guild_id: int = None,
+               guild_name: str = None, rating: int = 5, content: str = "") -> Optional[int]:
+        with get_db_context() as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    f"""
+                    INSERT INTO {DB_TABLE_PREFIX}reviews
+                    (user_id, user_username, guild_id, guild_name, rating, content, is_approved)
+                    VALUES (%s, %s, %s, %s, %s, %s, 0)
+                    """,
+                    (user_id, user_username, guild_id, guild_name, rating, content)
+                )
+                return cursor.lastrowid
+            except Exception as e:
+                logger.error(f"Erreur creation review: {e}")
+                return None
+
+    @staticmethod
+    def get_public(limit: int = 20) -> List[Dict]:
+        """Récupère les avis approuvés et visibles pour le site public."""
+        with get_db_context() as conn:
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute(
+                f"""
+                SELECT id, user_username, guild_name, rating, content, created_at
+                FROM {DB_TABLE_PREFIX}reviews
+                WHERE is_approved = 1 AND is_visible = 1
+                ORDER BY created_at DESC
+                LIMIT %s
+                """,
+                (min(int(limit), 50),)
+            )
+            return cursor.fetchall()
+
+    @staticmethod
+    def list_pending(limit: int = 50) -> List[Dict]:
+        """Liste les avis en attente de modération (admin)."""
+        with get_db_context() as conn:
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute(
+                f"""
+                SELECT * FROM {DB_TABLE_PREFIX}reviews
+                WHERE is_approved = 0
+                ORDER BY created_at DESC
+                LIMIT %s
+                """,
+                (limit,)
+            )
+            return cursor.fetchall()
+
+    @staticmethod
+    def approve(review_id: int, approved: bool = True) -> bool:
+        with get_db_context() as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    f"UPDATE {DB_TABLE_PREFIX}reviews SET is_approved = %s WHERE id = %s",
+                    (1 if approved else 0, review_id)
+                )
+                return True
+            except Exception as e:
+                logger.error(f"Erreur approval review: {e}")
+                return False
+
+    @staticmethod
+    def delete(review_id: int) -> bool:
+        with get_db_context() as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute(f"DELETE FROM {DB_TABLE_PREFIX}reviews WHERE id = %s", (review_id,))
+                return True
+            except Exception as e:
+                logger.error(f"Erreur suppression review: {e}")
+                return False
+
+
+# ============================================================================
+# VAI_TICKET_TAGS (Task 5.1)
+# ============================================================================
+
+class TicketTagModel:
+    """Tags/labels pour les tickets."""
+
+    @staticmethod
+    def create(guild_id: int, label: str, color: str = "#2DFF8F", emoji: str = None) -> Optional[int]:
+        with get_db_context() as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    f"""
+                    INSERT INTO {DB_TABLE_PREFIX}ticket_tags (guild_id, label, color, emoji)
+                    VALUES (%s, %s, %s, %s)
+                    ON DUPLICATE KEY UPDATE color = VALUES(color), emoji = VALUES(emoji), is_active = 1
+                    """,
+                    (guild_id, label, color, emoji)
+                )
+                return cursor.lastrowid
+            except Exception as e:
+                logger.error(f"Erreur creation tag: {e}")
+                return None
+
+    @staticmethod
+    def get_by_guild(guild_id: int) -> List[Dict]:
+        with get_db_context() as conn:
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute(
+                f"SELECT * FROM {DB_TABLE_PREFIX}ticket_tags WHERE guild_id = %s AND is_active = 1",
+                (guild_id,)
+            )
+            return cursor.fetchall()
+
+    @staticmethod
+    def add_to_ticket(ticket_id: int, tag_id: int) -> bool:
+        with get_db_context() as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    f"INSERT IGNORE INTO {DB_TABLE_PREFIX}ticket_tag_links (ticket_id, tag_id) VALUES (%s, %s)",
+                    (ticket_id, tag_id)
+                )
+                return True
+            except Exception as e:
+                logger.error(f"Erreur ajout tag au ticket: {e}")
+                return False
+
+    @staticmethod
+    def remove_from_ticket(ticket_id: int, tag_id: int) -> bool:
+        with get_db_context() as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    f"DELETE FROM {DB_TABLE_PREFIX}ticket_tag_links WHERE ticket_id = %s AND tag_id = %s",
+                    (ticket_id, tag_id)
+                )
+                return True
+            except Exception as e:
+                logger.error(f"Erreur retrait tag du ticket: {e}")
+                return False
+
+    @staticmethod
+    def get_tags_for_ticket(ticket_id: int) -> List[Dict]:
+        with get_db_context() as conn:
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute(
+                f"""
+                SELECT t.* FROM {DB_TABLE_PREFIX}ticket_tags t
+                JOIN {DB_TABLE_PREFIX}ticket_tag_links l ON t.id = l.tag_id
+                WHERE l.ticket_id = %s AND t.is_active = 1
+                """,
+                (ticket_id,)
+            )
+            return cursor.fetchall()
+
+
+# ============================================================================
+# VAI_BLACKLIST (Task 5.4)
+# ============================================================================
+
+class BlacklistModel:
+    """Liste noire d'utilisateurs par serveur."""
+
+    @staticmethod
+    def add(guild_id: int, user_id: int, reason: str = None, added_by: int = None,
+            expires_at: datetime = None) -> bool:
+        with get_db_context() as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    f"""
+                    INSERT INTO {DB_TABLE_PREFIX}blacklist (guild_id, user_id, reason, added_by, expires_at)
+                    VALUES (%s, %s, %s, %s, %s)
+                    ON DUPLICATE KEY UPDATE reason = VALUES(reason), added_by = VALUES(added_by), expires_at = VALUES(expires_at)
+                    """,
+                    (guild_id, user_id, reason, added_by, expires_at)
+                )
+                return True
+            except Exception as e:
+                logger.error(f"Erreur ajout blacklist: {e}")
+                return False
+
+    @staticmethod
+    def remove(guild_id: int, user_id: int) -> bool:
+        with get_db_context() as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    f"DELETE FROM {DB_TABLE_PREFIX}blacklist WHERE guild_id = %s AND user_id = %s",
+                    (guild_id, user_id)
+                )
+                return True
+            except Exception as e:
+                logger.error(f"Erreur retrait blacklist: {e}")
+                return False
+
+    @staticmethod
+    def is_blacklisted(guild_id: int, user_id: int) -> bool:
+        with get_db_context() as conn:
+            cursor = conn.cursor()
+            cursor.execute(
+                f"""
+                SELECT 1 FROM {DB_TABLE_PREFIX}blacklist
+                WHERE guild_id = %s AND user_id = %s
+                AND (expires_at IS NULL OR expires_at > NOW())
+                LIMIT 1
+                """,
+                (guild_id, user_id)
+            )
+            return cursor.fetchone() is not None
+
+    @staticmethod
+    def get_by_guild(guild_id: int) -> List[Dict]:
+        with get_db_context() as conn:
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute(
+                f"""
+                SELECT * FROM {DB_TABLE_PREFIX}blacklist
+                WHERE guild_id = %s AND (expires_at IS NULL OR expires_at > NOW())
+                ORDER BY created_at DESC
+                """,
+                (guild_id,)
+            )
+            return cursor.fetchall()
+
+
+# ============================================================================
+# VAI_SNIPPETS (Task 5.3)
+# ============================================================================
+
+class SnippetModel:
+    """Réponses prédéfinies (snippets/canned responses)."""
+
+    @staticmethod
+    def create(guild_id: int, trigger: str, content: str,
+               language: str = "fr", auto_translate: bool = True) -> Optional[int]:
+        with get_db_context() as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    f"""
+                    INSERT INTO {DB_TABLE_PREFIX}snippets (guild_id, trigger, content, language, auto_translate)
+                    VALUES (%s, %s, %s, %s, %s)
+                    """,
+                    (guild_id, trigger.lower(), content, language, 1 if auto_translate else 0)
+                )
+                return cursor.lastrowid
+            except Exception as e:
+                logger.error(f"Erreur creation snippet: {e}")
+                return None
+
+    @staticmethod
+    def get_by_guild(guild_id: int) -> List[Dict]:
+        with get_db_context() as conn:
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute(
+                f"SELECT * FROM {DB_TABLE_PREFIX}snippets WHERE guild_id = %s ORDER BY trigger",
+                (guild_id,)
+            )
+            return cursor.fetchall()
+
+    @staticmethod
+    def get_by_trigger(guild_id: int, trigger: str) -> Optional[Dict]:
+        with get_db_context() as conn:
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute(
+                f"SELECT * FROM {DB_TABLE_PREFIX}snippets WHERE guild_id = %s AND trigger = %s LIMIT 1",
+                (guild_id, trigger.lower())
+            )
+            return cursor.fetchone()
+
+    @staticmethod
+    def delete(snippet_id: int) -> bool:
+        with get_db_context() as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute(f"DELETE FROM {DB_TABLE_PREFIX}snippets WHERE id = %s", (snippet_id,))
+                return True
+            except Exception as e:
+                logger.error(f"Erreur suppression snippet: {e}")
+                return False
+
+
+# ============================================================================
+# VAI_TICKET_NOTES (Task 5.2)
+# ============================================================================
+
+class TicketNoteModel:
+    """Notes internes staff sur les tickets."""
+
+    @staticmethod
+    def create(ticket_id: int, author_id: int, author_username: str, content: str) -> Optional[int]:
+        with get_db_context() as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    f"""
+                    INSERT INTO {DB_TABLE_PREFIX}ticket_notes (ticket_id, author_id, author_username, content)
+                    VALUES (%s, %s, %s, %s)
+                    """,
+                    (ticket_id, author_id, author_username, content)
+                )
+                return cursor.lastrowid
+            except Exception as e:
+                logger.error(f"Erreur creation note: {e}")
+                return None
+
+    @staticmethod
+    def get_by_ticket(ticket_id: int) -> List[Dict]:
+        with get_db_context() as conn:
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute(
+                f"SELECT * FROM {DB_TABLE_PREFIX}ticket_notes WHERE ticket_id = %s ORDER BY created_at DESC",
+                (ticket_id,)
+            )
+            return cursor.fetchall()
+
+    @staticmethod
+    def delete(note_id: int) -> bool:
+        with get_db_context() as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute(f"DELETE FROM {DB_TABLE_PREFIX}ticket_notes WHERE id = %s", (note_id,))
+                return True
+            except Exception as e:
+                logger.error(f"Erreur suppression note: {e}")
+                return False
+
+
+# ============================================================================
+# VAI_OUTBOUND_WEBHOOKS (Task 9.1)
+# ============================================================================
+
+class OutboundWebhookModel:
+    """Webhooks sortants pour intégrations tierces."""
+
+    @staticmethod
+    def create(guild_id: int, url: str, events: List[str], secret: str = None) -> Optional[int]:
+        import json
+        with get_db_context() as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    f"""
+                    INSERT INTO {DB_TABLE_PREFIX}outbound_webhooks (guild_id, url, secret, events)
+                    VALUES (%s, %s, %s, %s)
+                    """,
+                    (guild_id, url, secret, json.dumps(events))
+                )
+                return cursor.lastrowid
+            except Exception as e:
+                logger.error(f"Erreur creation webhook: {e}")
+                return None
+
+    @staticmethod
+    def get_by_guild(guild_id: int) -> List[Dict]:
+        with get_db_context() as conn:
+            cursor = conn.cursor(dictionary=True)
+            cursor.execute(
+                f"SELECT * FROM {DB_TABLE_PREFIX}outbound_webhooks WHERE guild_id = %s AND is_active = 1",
+                (guild_id,)
+            )
+            return cursor.fetchall()
+
+    @staticmethod
+    def update_status(webhook_id: int, status_code: int) -> bool:
+        with get_db_context() as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute(
+                    f"UPDATE {DB_TABLE_PREFIX}outbound_webhooks SET last_status = %s WHERE id = %s",
+                    (status_code, webhook_id)
+                )
+                return True
+            except Exception as e:
+                logger.error(f"Erreur update status webhook: {e}")
+                return False
+
+    @staticmethod
+    def delete(webhook_id: int) -> bool:
+        with get_db_context() as conn:
+            cursor = conn.cursor()
+            try:
+                cursor.execute(f"DELETE FROM {DB_TABLE_PREFIX}outbound_webhooks WHERE id = %s", (webhook_id,))
+                return True
+            except Exception as e:
+                logger.error(f"Erreur suppression webhook: {e}")
+                return False
+
