@@ -10,6 +10,40 @@ const observer = new IntersectionObserver((entries) => {
 }, { threshold: 0.12 });
 revealEls.forEach(el => observer.observe(el));
 
+// ── BILLING TOGGLE ──
+const billingToggle = document.getElementById('billingToggle');
+if (billingToggle) {
+  billingToggle.addEventListener('change', function() {
+    const isAnnual = this.checked;
+    const pricingCards = document.querySelectorAll('.pricing-card');
+    const monthlyLabel = document.querySelector('.billing-label:first-of-type');
+    const annualLabel = document.querySelector('.billing-label:nth-of-type(2)');
+    
+    pricingCards.forEach(card => {
+      if (isAnnual) {
+        card.classList.add('annual-mode');
+      } else {
+        card.classList.remove('annual-mode');
+      }
+    });
+    
+    // Update label colors
+    if (monthlyLabel && annualLabel) {
+      if (isAnnual) {
+        monthlyLabel.style.color = 'var(--text3)';
+        monthlyLabel.style.fontWeight = '400';
+        annualLabel.style.color = 'var(--text)';
+        annualLabel.style.fontWeight = '600';
+      } else {
+        monthlyLabel.style.color = 'var(--text)';
+        monthlyLabel.style.fontWeight = '600';
+        annualLabel.style.color = 'var(--text3)';
+        annualLabel.style.fontWeight = '400';
+      }
+    }
+  });
+}
+
 // ── NAVBAR SCROLL ──
 const navbar = document.querySelector('.navbar');
 window.addEventListener('scroll', () => {

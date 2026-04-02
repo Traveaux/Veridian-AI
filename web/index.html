@@ -297,13 +297,33 @@
     <style>
       #billingToggle:checked ~ .toggle-slider { background: var(--accent) !important; }
       #billingToggle:checked ~ .toggle-knob { transform: translateX(24px); background: #000 !important; }
+      
+      /* Annual pricing styles */
+      .pricing-card .plan-price.annual { display: none; }
+      .pricing-card.annual-mode .plan-price.monthly { display: none; }
+      .pricing-card.annual-mode .plan-price.annual { display: inline; }
+      
+      /* Business card centered */
+      .pricing-card.business-card {
+        grid-column: span 1;
+      }
+      @media (min-width: 1024px) {
+        .pricing-grid:has(.pricing-card:nth-child(4)) {
+          grid-template-columns: repeat(4, 1fr);
+        }
+        .pricing-card.business-card {
+          display: flex;
+          flex-direction: column;
+        }
+      }
     </style>
 
-    <div class="pricing-grid">
+    <div class="pricing-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:24px;align-items:start">
       <!-- Free -->
       <div class="pricing-card reveal reveal-delay-1">
         <div class="plan-name" data-i18n="plan_free">Free</div>
-        <div class="plan-price"><span data-i18n="plan_free_price">0</span><span data-i18n="price_per_month">/mois</span></div>
+        <div class="plan-price monthly"><span data-i18n="plan_free_price">0</span><span data-i18n="price_per_month">/mois</span></div>
+        <div class="plan-price annual"><span data-i18n="plan_free_price">0</span><span data-i18n="price_per_year">/an</span></div>
         <div class="plan-desc" data-i18n="plan_free_desc">Pour tester Veridian AI sur votre serveur.</div>
         <ul class="plan-features">
           <li data-i18n="plan_feature_tickets_50">50 tickets / mois</li>
@@ -322,7 +342,8 @@
       <div class="pricing-card featured reveal reveal-delay-2">
         <div class="featured-badge"><svg aria-hidden="true" width="12" height="12" viewBox="0 0 24 24" fill="currentColor" style="margin-right:6px"><path d="M12 3l2.4 5 5.6.8-4 3.9.9 5.6L12 15.9 7.1 18.3l.9-5.6-4-3.9 5.6-.8z"></path></svg><span data-i18n="plan_starter_badge">POPULAIRE</span></div>
         <div class="plan-name" data-i18n="plan_starter">Starter</div>
-        <div class="plan-price"><span class="plan-currency">€</span><span data-i18n="plan_starter_price">4</span><span data-i18n="price_per_month">/mois</span></div>
+        <div class="plan-price monthly"><span class="plan-currency">€</span><span data-i18n="plan_starter_price">4</span><span data-i18n="price_per_month">/mois</span></div>
+        <div class="plan-price annual"><span class="plan-currency">€</span><span data-i18n="plan_starter_price_annual">36</span><span data-i18n="price_per_year">/an</span></div>
         <div class="plan-desc" data-i18n="plan_starter_desc">Pour les communautés actives qui veulent un vrai support structuré.</div>
         <ul class="plan-features">
           <li data-i18n="plan_feature_tickets_500">500 tickets / mois</li>
@@ -340,7 +361,8 @@
       <!-- Pro -->
       <div class="pricing-card reveal reveal-delay-3">
         <div class="plan-name" data-i18n="plan_pro">Pro</div>
-        <div class="plan-price"><span class="plan-currency">€</span><span data-i18n="plan_pro_price">12</span><span data-i18n="price_per_month">/mois</span></div>
+        <div class="plan-price monthly"><span class="plan-currency">€</span><span data-i18n="plan_pro_price">12</span><span data-i18n="price_per_month">/mois</span></div>
+        <div class="plan-price annual"><span class="plan-currency">€</span><span data-i18n="plan_pro_price_annual">108</span><span data-i18n="price_per_year">/an</span></div>
         <div class="plan-desc" data-i18n="plan_pro_desc">Pour les équipes support actives avec automatisation et analytics.</div>
         <ul class="plan-features">
           <li data-i18n="plan_feature_tickets_unlimited">Tickets illimités</li>
@@ -356,9 +378,10 @@
       </div>
 
       <!-- Business -->
-      <div class="pricing-card reveal reveal-delay-4">
+      <div class="pricing-card reveal reveal-delay-4 business-card">
         <div class="plan-name" data-i18n="plan_business">Business</div>
-        <div class="plan-price"><span class="plan-currency">€</span><span data-i18n="plan_business_price">29</span><span data-i18n="price_per_month">/mois</span></div>
+        <div class="plan-price monthly"><span class="plan-currency">€</span><span data-i18n="plan_business_price">29</span><span data-i18n="price_per_month">/mois</span></div>
+        <div class="plan-price annual"><span class="plan-currency">€</span><span data-i18n="plan_business_price_annual">261</span><span data-i18n="price_per_year">/an</span></div>
         <div class="plan-desc" data-i18n="plan_business_desc">Pour les opérations avancées avec SLA, workflows et extensions premium.</div>
         <ul class="plan-features">
           <li data-i18n="plan_feature_tickets_unlimited">Tickets illimités</li>
