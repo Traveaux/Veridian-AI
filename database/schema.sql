@@ -708,6 +708,26 @@ CREATE TABLE IF NOT EXISTS vai_outbound_webhooks (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ============================================================================
+-- VAI_I18N_TRANSLATIONS - Traductions dynamiques via Grok API
+-- Stockage des traductions générées pour toutes les langues
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS vai_i18n_translations (
+    id              INT AUTO_INCREMENT PRIMARY KEY,
+    lang            VARCHAR(10)     NOT NULL        COMMENT 'Code langue ISO 639-1 (fr, en, es, ...)',
+    key_hash        VARCHAR(32)     NOT NULL        COMMENT 'MD5 de la clé de traduction',
+    translation_key VARCHAR(200)    NOT NULL        COMMENT 'Clé originale data-i18n',
+    source_text     VARCHAR(500)    NOT NULL        COMMENT 'Texte source (anglais)',
+    translated_text VARCHAR(500)    NOT NULL        COMMENT 'Texte traduit',
+    created_at      TIMESTAMP       DEFAULT CURRENT_TIMESTAMP,
+    updated_at      TIMESTAMP       DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY uniq_lang_key (lang, key_hash),
+    KEY idx_lang    (lang),
+    KEY idx_key_hash (key_hash),
+    KEY idx_updated (updated_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ============================================================================
 -- Migration depuis v0.2 (si la DB existe deja)
 -- CREATE TABLE IF NOT EXISTS vai_temp_codes (...) -- voir ci-dessus
 -- ============================================================================

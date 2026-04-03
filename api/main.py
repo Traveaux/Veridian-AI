@@ -43,6 +43,7 @@ from bot.config import VERSION
 from api.routes.auth import router as auth_router
 from api.routes.internal import router as internal_router   # ← FIX: manquait dans l'original
 from api.routes.webhook import router as webhook_router
+from api.routes.i18n import router as i18n_router
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -96,6 +97,7 @@ _ROUTE_LIMITS = {
     "/auth/discord/login": (20, 60),
     "/internal/": (120, 60),
     "/webhook/": (200, 60),
+    "/i18n/": (60, 60),  # Limiter les appels de traduction
 }
 
 
@@ -185,6 +187,7 @@ app.include_router(internal_router)
 app.include_router(webhook_router)
 from api.routes.dashboard import router as dashboard_router
 app.include_router(dashboard_router)
+app.include_router(i18n_router)
 
 # ============================================================================
 # Logging
