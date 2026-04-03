@@ -572,6 +572,7 @@
         <button class="settings-tab active" type="button" data-settings-tab="general" role="tab" aria-selected="true" data-i18n="dash_settings_general">Général</button>
         <button class="settings-tab" type="button" data-settings-tab="tickets" role="tab" aria-selected="false" data-i18n="dash_settings_tickets">Tickets</button>
         <button class="settings-tab" type="button" data-settings-tab="ai" role="tab" aria-selected="false" data-i18n="dash_settings_ai">IA de support</button>
+        <button class="settings-tab" type="button" data-settings-tab="advanced" role="tab" aria-selected="false" data-i18n="dash_settings_advanced">Avancé</button>
       </aside>
 
       <div class="settings-content">
@@ -883,6 +884,94 @@
           </div>
         </div>
       </div><!-- /.settings-panel ai -->
+
+      <!-- Advanced features panel -->
+      <div class="settings-panel" data-settings-panel="advanced">
+        <div class="grid-2">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title"><div class="card-dot"></div><span data-i18n="dash_advanced_assignment">Attribution automatique</span></div>
+            </div>
+            <div class="card-body">
+              <div class="toggle-row">
+                <div class="toggle-info">
+                  <div class="toggle-name" data-i18n="dash_toggle_round_robin">Round-robin auto-assignment</div>
+                  <div class="toggle-desc" data-i18n="dash_desc_round_robin">Répartition équilibrée des tickets parmi le staff</div>
+                </div>
+                <div class="toggle-switch" id="toggle-round-robin" data-setting-key="round_robin_assignment"></div>
+              </div>
+              <div style="margin-top:12px;padding:10px;background:var(--surface);border-radius:6px;font-size:11px;color:var(--text2)" data-i18n="dash_help_round_robin">
+                Quand un ticket est ouvert, il est automatiquement assigné au membre du staff ayant le moins de tickets actifs.
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title"><div class="card-dot"></div><span data-i18n="dash_advanced_sla">SLA et délais</span></div>
+            </div>
+            <div class="card-body">
+              <div class="toggle-row">
+                <div class="toggle-info">
+                  <div class="toggle-name" data-i18n="dash_toggle_sla">Alertes SLA (Service Level Agreement)</div>
+                  <div class="toggle-desc" data-i18n="dash_desc_sla">Notifications si tickets non traités dans les délais</div>
+                </div>
+                <div class="toggle-switch" id="toggle-sla-alerts" data-setting-key="sla_alerts_enabled"></div>
+              </div>
+              <div class="form-group" style="margin-top:12px">
+                <label class="form-label" data-i18n="dash_label_sla_threshold">Seuil SLA (minutes)</label>
+                <input class="form-input" id="settings-sla-threshold" type="number" min="5" max="1440" step="5" value="30" placeholder="30">
+                <div style="font-size:10px;color:var(--text3);margin-top:4px" data-i18n="dash_help_sla_threshold">Temps avant alerte si ticket non pris en charge</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title"><div class="card-dot"></div><span data-i18n="dash_advanced_feedback">Feedback client</span></div>
+            </div>
+            <div class="card-body">
+              <div class="toggle-row">
+                <div class="toggle-info">
+                  <div class="toggle-name" data-i18n="dash_toggle_satisfaction">Enquête de satisfaction</div>
+                  <div class="toggle-desc" data-i18n="dash_desc_satisfaction">Demande une note après fermeture du ticket</div>
+                </div>
+                <div class="toggle-switch" id="toggle-satisfaction" data-setting-key="satisfaction_survey_enabled"></div>
+              </div>
+              <div class="form-group" style="margin-top:12px">
+                <label class="form-label" data-i18n="dash_label_satisfaction_message">Message de demande</label>
+                <input class="form-input" id="settings-satisfaction-message" type="text" placeholder="Merci de noter votre expérience..." data-i18n-placeholder="dash_placeholder_satisfaction">
+                <div style="font-size:10px;color:var(--text3);margin-top:4px" data-i18n="dash_help_satisfaction">Message envoyé avec les boutons de notation 1-5 étoiles</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title"><div class="card-dot"></div><span data-i18n="dash_advanced_security">Sécurité & Limites</span></div>
+            </div>
+            <div class="card-body">
+              <div class="toggle-row">
+                <div class="toggle-info">
+                  <div class="toggle-name" data-i18n="dash_toggle_anti_spam">Anti-spam tickets</div>
+                  <div class="toggle-desc" data-i18n="dash_desc_anti_spam">Limite les tickets par utilisateur sur une période</div>
+                </div>
+                <div class="toggle-switch" id="toggle-anti-spam" data-setting-key="anti_spam_enabled"></div>
+              </div>
+              <div class="settings-compact-grid settings-compact-grid-tight" style="margin-top:12px">
+                <div class="form-group">
+                  <label class="form-label" data-i18n="dash_label_spam_limit">Max tickets / heure</label>
+                  <input class="form-input" id="settings-spam-limit" type="number" min="1" max="20" value="3" placeholder="3">
+                </div>
+                <div class="form-group">
+                  <label class="form-label" data-i18n="dash_label_spam_cooldown">Cooldown (minutes)</label>
+                  <input class="form-input" id="settings-spam-cooldown" type="number" min="5" max="120" value="30" placeholder="30">
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div><!-- /.settings-panel advanced -->
       </div><!-- /.settings-content -->
       </div><!-- /.settings-layout -->
     </div>

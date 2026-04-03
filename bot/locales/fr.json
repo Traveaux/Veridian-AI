@@ -167,5 +167,28 @@
     "admin": {
         "blacklist_added": "Utilisateur ajouté à la liste noire.",
         "blacklist_removed": "Utilisateur retiré de la liste noire."
+    },
+    "dashboard": {
+        "settings_advanced": "Avancé",
+        "advanced_assignment": "Attribution automatique",
+        "toggle_round_robin": "Round-robin auto-assignment",
+        "desc_round_robin": "Répartition équilibrée des tickets parmi le staff",
+        "help_round_robin": "Quand un ticket est ouvert, il est automatiquement assigné au membre du staff ayant le moins de tickets actifs.",
+        "advanced_sla": "SLA et délais",
+        "toggle_sla": "Alertes SLA (Service Level Agreement)",
+        "desc_sla": "Notifications si tickets non traités dans les délais",
+        "label_sla_threshold": "Seuil SLA (minutes)",
+        "help_sla_threshold": "Temps avant alerte si ticket non pris en charge",
+        "advanced_feedback": "Feedback client",
+        "toggle_satisfaction": "Enquête de satisfaction",
+        "desc_satisfaction": "Demande une note après fermeture du ticket",
+        "label_satisfaction_message": "Message de demande",
+        "placeholder_satisfaction": "Merci de noter votre expérience...",
+        "help_satisfaction": "Message envoyé avec les boutons de notation 1-5 étoiles",
+        "advanced_security": "Sécurité & Limites",
+        "toggle_anti_spam": "Anti-spam tickets",
+        "desc_anti_spam": "Limite les tickets par utilisateur sur une période",
+        "label_spam_limit": "Max tickets / heure",
+        "label_spam_cooldown": "Cooldown (minutes)"
     }
 }

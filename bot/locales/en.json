@@ -167,5 +167,28 @@
     "admin": {
         "blacklist_added": "User added to the blacklist.",
         "blacklist_removed": "User removed from the blacklist."
+    },
+    "dashboard": {
+        "settings_advanced": "Advanced",
+        "advanced_assignment": "Auto Assignment",
+        "toggle_round_robin": "Round-robin auto-assignment",
+        "desc_round_robin": "Balanced ticket distribution among staff",
+        "help_round_robin": "When a ticket is opened, it is automatically assigned to the staff member with the fewest active tickets.",
+        "advanced_sla": "SLA & Time Limits",
+        "toggle_sla": "SLA Alerts (Service Level Agreement)",
+        "desc_sla": "Notifications for tickets not handled within deadlines",
+        "label_sla_threshold": "SLA Threshold (minutes)",
+        "help_sla_threshold": "Time before alert if ticket not taken",
+        "advanced_feedback": "Customer Feedback",
+        "toggle_satisfaction": "Satisfaction Survey",
+        "desc_satisfaction": "Request a rating after ticket closure",
+        "label_satisfaction_message": "Request message",
+        "placeholder_satisfaction": "Thank you for rating your experience...",
+        "help_satisfaction": "Message sent with 1-5 star rating buttons",
+        "advanced_security": "Security & Limits",
+        "toggle_anti_spam": "Anti-spam tickets",
+        "desc_anti_spam": "Limits tickets per user over a period",
+        "label_spam_limit": "Max tickets / hour",
+        "label_spam_cooldown": "Cooldown (minutes)"
     }
 }
