@@ -195,7 +195,7 @@
         </svg>
         <span data-i18n="dash_kb">Knowledge Base</span>
       </div>
-      <div class="nav-item" data-page="analytics">
+      <div class="nav-item" data-page="analytics" data-super-admin style="display:none">
         <svg class="nav-icon" viewBox="0 0 14 14" fill="none">
           <rect x="1" y="8" width="3" height="5" rx=".5" fill="currentColor" opacity=".6"/>
           <rect x="5.5" y="4" width="3" height="9" rx=".5" fill="currentColor" opacity=".8"/>
@@ -661,9 +661,9 @@
               <div class="toggle-switch" id="toggle-staff-suggestions" data-setting-key="staff_suggestions" style="opacity:0.4;pointer-events:none"></div>
             </div>
 
-            <div style="margin-top:16px;padding:12px;background:var(--blue-dim);border:1px solid rgba(77,166,255,0.15);border-radius:8px;display:flex;align-items:center;justify-content:space-between;gap:10px">
+            <div style="margin-top:16px;padding:12px;background:var(--green-dark-dim);border:1px solid rgba(34,197,94,0.15);border-radius:8px;display:flex;align-items:center;justify-content:space-between;gap:10px">
               <div>
-                <div style="font-size:11px;font-family:'Space Mono',monospace;color:var(--blue);margin-bottom:3px" data-i18n="dash_current_plan">PLAN ACTUEL</div>
+                <div style="font-size:11px;font-family:'Space Mono',monospace;color:var(--green-dark);margin-bottom:3px" data-i18n="dash_current_plan">PLAN ACTUEL</div>
                 <div style="font-size:13px;font-weight:700;color:var(--text)"><span id="settings-current-plan">—</span> <span id="settings-current-plan-price" style="color:var(--text3);font-weight:400"></span></div>
               </div>
               <button class="btn btn-ghost btn-sm" id="settings-upgrade-btn" style="font-size:11px;display:inline-flex;align-items:center;gap:6px" data-nav="orders" type="button">
