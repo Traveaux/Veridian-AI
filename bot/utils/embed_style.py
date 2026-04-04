@@ -51,10 +51,8 @@ def strip_emojis(text: str | None) -> str | None:
 
 def _wrap_with_border(text: str | None) -> str:
     if not text:
-        return "_____"
-    if text.startswith("_____\n") and text.endswith("\n_____"):
-        return text
-    return f"_____\n{text}"
+        return ""
+    return text
 
 
 def translation_embed_title(language_code: str | None) -> str:
@@ -70,10 +68,9 @@ def style_embed(embed: discord.Embed) -> discord.Embed:
         embed.title = strip_emojis(embed.title) or None
 
     if embed.description:
-        # Strict strip for description to remove all fancy characters
-        embed.description = _wrap_with_border(strip_emojis(embed.description))
+        embed.description = strip_emojis(embed.description) or None
     else:
-        embed.description = "_____"
+        embed.description = None
 
     if embed.author.name:
         name = strip_emojis(embed.author.name)
@@ -91,15 +88,9 @@ def style_embed(embed: discord.Embed) -> discord.Embed:
     if embed.footer.text:
         footer_text = strip_emojis(embed.footer.text)
         if footer_text:
-            if footer_text.endswith("_____"):
-                footer_value = footer_text
-            else:
-                footer_value = f"{footer_text}\n_____"
-            embed.set_footer(text=footer_value, icon_url=embed.footer.icon_url)
+            embed.set_footer(text=footer_text, icon_url=embed.footer.icon_url)
         else:
-            embed.set_footer(text="_____", icon_url=embed.footer.icon_url)
-    else:
-        embed.set_footer(text="_____")
+            embed.set_footer(text=None, icon_url=embed.footer.icon_url)
 
     return embed
 
