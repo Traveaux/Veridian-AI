@@ -92,6 +92,7 @@ CREATE TABLE IF NOT EXISTS vai_tickets (
     assigned_staff_name VARCHAR(100),
     ai_intent           TEXT                        COMMENT 'Analyse IA du premier message (Smart Welcome)',
     priority            ENUM('low','medium','high','urgent') DEFAULT 'medium',
+    sla_breach_alert_sent TINYINT(1) DEFAULT 0              COMMENT 'Alerte SLA envoyée (1=oui)',
     close_reason        TEXT,
     transcript          LONGTEXT                    COMMENT 'Resume IA genere a la cloture',
     opened_at           TIMESTAMP       DEFAULT CURRENT_TIMESTAMP,
