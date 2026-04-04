@@ -144,13 +144,17 @@ async def send_localized_embed(
     
     style_embed(embed)
 
+    send_kwargs: dict = {"embed": embed}
+    if view is not None:
+        send_kwargs["view"] = view
+
     if isinstance(ctx_or_interaction, discord.Interaction):
+        send_kwargs["ephemeral"] = ephemeral
         if ctx_or_interaction.response.is_done():
-            return await ctx_or_interaction.followup.send(embed=embed, ephemeral=ephemeral, view=view)
-        else:
-            return await ctx_or_interaction.response.send_message(embed=embed, ephemeral=ephemeral, view=view)
-    else:
-        return await ctx_or_interaction.send(embed=embed, view=view)
+            return await ctx_or_interaction.followup.send(**send_kwargs)
+        return await ctx_or_interaction.response.send_message(**send_kwargs)
+
+    return await ctx_or_interaction.send(**send_kwargs)
 
 
 def _normalize_lang(code: str | None, fallback: str = "en") -> str:
