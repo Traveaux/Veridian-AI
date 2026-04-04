@@ -264,7 +264,7 @@ class TicketsCog(commands.Cog):
                     JOIN {DB_TABLE_PREFIX}guilds g ON t.guild_id = g.id
                     WHERE t.status IN ('open', 'in_progress')
                     AND t.assigned_staff_id IS NOT NULL
-                    AND g.plan IN ('pro', 'business')
+                    AND g.tier IN ('pro', 'business')
                     AND TIMESTAMPDIFF(MINUTE, t.opened_at, NOW()) > 120
                     AND (t.sla_breach_alert_sent IS NULL OR t.sla_breach_alert_sent = 0)
                     """
