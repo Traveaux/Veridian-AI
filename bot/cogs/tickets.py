@@ -1427,13 +1427,58 @@ class TicketsCog(commands.Cog):
         if isinstance(error, discord.app_commands.CommandOnCooldown):
             await send_localized_embed(
                 interaction, 
-                "tickets.wait_title", 
-                "tickets.wait_desc", 
-                seconds=int(error.retry_after), 
+                "common.cooldown_title", 
+                "common.cooldown_desc", 
+                seconds=int(error.retry_after),
                 ephemeral=True
             )
         else:
             logger.error(f"Erreur TicketCog command: {error}")
+
+    # ------------------------------------------------------------------
+    # /list_emojis - Commande temporaire pour lister les emojis custom
+    # ------------------------------------------------------------------
+
+    @discord.app_commands.command(name="list_emojis", description="[ADMIN] Liste tous les emojis custom du serveur avec leurs IDs")
+    @discord.app_commands.checks.has_permissions(administrator=True)
+    async def list_emojis(self, interaction: discord.Interaction):
+        """Liste tous les emojis custom du serveur pour récupérer leurs IDs."""
+        await interaction.response.defer(ephemeral=True)
+        
+        guild = interaction.guild
+        if not guild:
+            await interaction.followup.send("Cette commande doit être utilisée dans un serveur.", ephemeral=True)
+            return
+        
+        emojis = guild.emojis
+        if not emojis:
+            await interaction.followup.send("Aucun emoji custom sur ce serveur.", ephemeral=True)
+            return
+        
+        # Formater la liste
+        lines = []
+        for emoji in emojis:
+            animated = "a" if emoji.animated else ""
+            emoji_str = f"<{animated}:{emoji.name}:{emoji.id}>"
+            lines.append(f"`{emoji.name}`: {emoji_str} (`{emoji.id}`)")
+        
+        # Envoyer en plusieurs messages si nécessaire (limite 2000 caractères)
+        chunks = []
+        current_chunk = "**Emojis du serveur :**\n\n"
+        
+        for line in lines:
+            if len(current_chunk) + len(line) + 1 > 1900:
+                chunks.append(current_chunk)
+                current_chunk = "**Suite :**\n\n"
+            current_chunk += line + "\n"
+        
+        if current_chunk:
+            chunks.append(current_chunk)
+        
+        for chunk in chunks:
+            await interaction.followup.send(chunk, ephemeral=True)
+        
+        logger.info(f"Liste des emojis envoyée à {interaction.user.id}")
 
 
 # ============================================================================

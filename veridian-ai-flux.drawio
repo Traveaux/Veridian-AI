@@ -1,0 +1,407 @@
+<mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1654" pageHeight="1169" math="0" shadow="0">
+  <root>
+    <mxCell id="0" />
+    <mxCell id="1" parent="0" />
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- TITRE -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <mxCell id="title" value="Veridian AI — Flux Architecture v1.0" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=22;fontStyle=1;fontColor=#1a1a2e;" vertex="1" parent="1">
+      <mxGeometry x="480" y="20" width="700" height="40" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- ZONE: UTILISATEURS DISCORD -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <mxCell id="zone_discord_users" value="Utilisateurs Discord" style="swimlane;startSize=30;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="20" y="80" width="200" height="260" as="geometry" />
+    </mxCell>
+
+    <mxCell id="user_member" value="Membre de la communauté&#xa;(ouvre un ticket, écrit des messages,&#xa;demande du support)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="zone_discord_users">
+      <mxGeometry x="10" y="50" width="180" height="60" as="geometry" />
+    </mxCell>
+
+    <mxCell id="user_admin" value="Admin Serveur&#xa;(configure via /pay,&#xa;accède au dashboard)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;" vertex="1" parent="zone_discord_users">
+      <mxGeometry x="10" y="130" width="180" height="50" as="geometry" />
+    </mxCell>
+
+    <mxCell id="user_owner" value="Bot Owner / Super Admin&#xa;(valide commandes,&#xa;gère abonnements)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=10;" vertex="1" parent="zone_discord_users">
+      <mxGeometry x="10" y="200" width="180" height="50" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- ZONE: BOT DISCORD -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <mxCell id="zone_bot" value="Bot Discord (discord.py)" style="swimlane;startSize=30;fillColor=#d5e8d4;strokeColor=#82b366;fontStyle=1;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="260" y="80" width="320" height="700" as="geometry" />
+    </mxCell>
+
+    <!-- COGS -->
+    <mxCell id="cog_tickets" value="🎫 Cog: Tickets&#xa;• /ticket (ouvre un ticket)&#xa;• /close (ferme + résumé IA)&#xa;• Traduction bidirectionnelle live&#xa;• Boutons: Prendre / Fermer / Transcript&#xa;• Auto-close (inactivité 3j)&#xa;• Satisfaction rating DM" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;align=left;" vertex="1" parent="zone_bot">
+      <mxGeometry x="10" y="40" width="300" height="100" as="geometry" />
+    </mxCell>
+
+    <mxCell id="cog_support" value="🤖 Cog: Support Public IA&#xa;• Écoute channel support désigné&#xa;• Réponse automatique (Groq / Llama)&#xa;• Détection langue auto&#xa;• Modération IA (malicious content)&#xa;• /premium, /status, /language, /stats" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;align=left;" vertex="1" parent="zone_bot">
+      <mxGeometry x="10" y="160" width="300" height="90" as="geometry" />
+    </mxCell>
+
+    <mxCell id="cog_payments" value="💳 Cog: Paiements&#xa;• /pay [paypal|giftcard|oxapay] [plan]&#xa;• Génère Order ID: VAI-YYYYMM-XXXX&#xa;• PayPal: DM instructions + notif owner&#xa;• Giftcard: DM interactif (code + image)&#xa;• Crypto: crée invoice OxaPay" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;align=left;" vertex="1" parent="zone_bot">
+      <mxGeometry x="10" y="270" width="300" height="90" as="geometry" />
+    </mxCell>
+
+    <mxCell id="cog_suggestions" value="💡 Cog: Suggestions Staff IA&#xa;• Analyse conversation ticket&#xa;• Génère suggestion de réponse&#xa;• Réservé plan Pro (staff_suggestions=1)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=10;align=left;" vertex="1" parent="zone_bot">
+      <mxGeometry x="10" y="380" width="300" height="60" as="geometry" />
+    </mxCell>
+
+    <!-- SERVICES -->
+    <mxCell id="label_services" value="SERVICES (couche métier)" style="text;html=1;strokeColor=none;fillColor=none;fontStyle=1;fontSize=10;fontColor=#006600;" vertex="1" parent="zone_bot">
+      <mxGeometry x="10" y="455" width="300" height="20" as="geometry" />
+    </mxCell>
+
+    <mxCell id="svc_groq" value="GroqClient&#xa;• generate_support_response()&#xa;• translate() → Llama 3.1 8B Fast&#xa;• generate_ticket_summary() → 70B&#xa;• classify_ticket_priority()&#xa;• 4 clés API avec fallback auto" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;align=left;" vertex="1" parent="zone_bot">
+      <mxGeometry x="10" y="480" width="140" height="100" as="geometry" />
+    </mxCell>
+
+    <mxCell id="svc_translator" value="TranslatorService&#xa;• detect_language() (langdetect)&#xa;• translate() avec cache SHA256&#xa;• translate_message_for_staff()&#xa;• translate_response_for_user()" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;align=left;" vertex="1" parent="zone_bot">
+      <mxGeometry x="160" y="480" width="140" height="100" as="geometry" />
+    </mxCell>
+
+    <mxCell id="svc_oxapay" value="OxaPayClient&#xa;• create_invoice()&#xa;• verify_webhook_signature()&#xa;  (HMAC-SHA256)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;align=left;" vertex="1" parent="zone_bot">
+      <mxGeometry x="10" y="590" width="140" height="70" as="geometry" />
+    </mxCell>
+
+    <mxCell id="svc_notif" value="NotificationService&#xa;• send_paypal_order_notification()&#xa;• send_giftcard_order_notification()&#xa;• notify_user_payment_confirmed()&#xa;• PaymentButtonView (Payé/Rejeté/Partiel)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;align=left;" vertex="1" parent="zone_bot">
+      <mxGeometry x="160" y="590" width="140" height="80" as="geometry" />
+    </mxCell>
+
+    <!-- LOOPS -->
+    <mxCell id="bot_loops" value="⏱ Background Tasks&#xa;• heartbeat_loop (60s) → vai_bot_status&#xa;• notification_processor_loop (60s) → DMs&#xa;• subscription_guard_loop (24h) → expiry&#xa;• auto_close_task (24h) → tickets inactifs&#xa;• sla_check_task (5min) → SLA breaches&#xa;• ticket_open_deploy_loop (30s) → messages" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;align=left;" vertex="1" parent="zone_bot">
+      <mxGeometry x="10" y="675" width="300" height="90" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- ZONE: API FASTAPI -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <mxCell id="zone_api" value="API Backend (FastAPI — api.veridiancloud.xyz)" style="swimlane;startSize=30;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="630" y="80" width="320" height="700" as="geometry" />
+    </mxCell>
+
+    <mxCell id="api_auth" value="🔐 /auth/* — OAuth2 Discord&#xa;• GET /auth/discord/login → redirect Discord&#xa;• GET /auth/callback → échange code&#xa;• POST /auth/exchange → temp_code → JWT&#xa;• GET /auth/user/me → profil utilisateur&#xa;• GET /auth/user/guilds → liste serveurs&#xa;• POST /auth/logout → révoque session&#xa;JWT stocké en localStorage (7j)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;align=left;" vertex="1" parent="zone_api">
+      <mxGeometry x="10" y="40" width="300" height="110" as="geometry" />
+    </mxCell>
+
+    <mxCell id="api_internal" value="🔧 /internal/* — Dashboard ↔ Bot&#xa;• GET/PUT /guild/{id}/config&#xa;• GET /guild/{id}/tickets (paginé)&#xa;• GET /guild/{id}/stats&#xa;• POST /guild/{id}/purchase&#xa;• POST /ticket/{id}/close|reopen&#xa;• PUT /ticket/{id}/priority&#xa;• GET/POST /guild/{id}/kb&#xa;• POST /bot/heartbeat&#xa;• GET /bot/status&#xa;Auth: JWT Bearer ou X-API-SECRET" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;align=left;" vertex="1" parent="zone_api">
+      <mxGeometry x="10" y="165" width="300" height="150" as="geometry" />
+    </mxCell>
+
+    <mxCell id="api_webhook" value="🪝 /webhook/oxapay — Paiement Crypto&#xa;• POST /webhook/oxapay&#xa;• Vérifie HMAC-SHA256&#xa;• Update vai_orders status→paid&#xa;• Crée vai_payments record&#xa;• Active vai_subscriptions&#xa;• Ajoute vai_pending_notifications&#xa;• Notifie Bot Owner" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;align=left;" vertex="1" parent="zone_api">
+      <mxGeometry x="10" y="330" width="300" height="110" as="geometry" />
+    </mxCell>
+
+    <mxCell id="api_dashboard" value="🛠 /dashboard/* — Super Admin&#xa;• GET /dashboard/orders/pending&#xa;• POST /dashboard/orders/{id}/validate&#xa;• POST /dashboard/orders/{id}/reject&#xa;• GET/POST /dashboard/subscriptions&#xa;• GET /dashboard/stats (global)&#xa;• GET/POST /dashboard/kb/{guild_id}&#xa;Auth: verify_super_admin() uniquement" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;align=left;" vertex="1" parent="zone_api">
+      <mxGeometry x="10" y="455" width="300" height="110" as="geometry" />
+    </mxCell>
+
+    <mxCell id="api_i18n" value="🌍 /i18n/* — Traductions web&#xa;• POST /i18n/translate (via API Grok xai-)&#xa;• GET /i18n/translations?lang=&amp;keys=&#xa;• POST /i18n/clear?lang=&#xa;• GET /i18n/stats&#xa;Stockage: vai_i18n_translations (MySQL)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=10;align=left;" vertex="1" parent="zone_api">
+      <mxGeometry x="10" y="580" width="300" height="80" as="geometry" />
+    </mxCell>
+
+    <mxCell id="api_middleware" value="🛡 Middlewares&#xa;• CORSMiddleware (veridiancloud.xyz)&#xa;• Rate Limiting in-memory (60 req/min)&#xa;• Security Headers (nosniff, no-store…)&#xa;• db_migrate auto au démarrage&#xa;• JWT verify + session DB revocation" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;align=left;" vertex="1" parent="zone_api">
+      <mxGeometry x="10" y="670" width="300" height="80" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- ZONE: BASE DE DONNÉES -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <mxCell id="zone_db" value="Base de données MySQL (vai_*)" style="swimlane;startSize=30;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="1000" y="80" width="300" height="700" as="geometry" />
+    </mxCell>
+
+    <mxCell id="db_guilds" value="vai_guilds&#xa;Config serveur, channels, messages,&#xa;boutons, toggles features, SLA, AI prompt" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="zone_db">
+      <mxGeometry x="10" y="40" width="280" height="50" as="geometry" />
+    </mxCell>
+
+    <mxCell id="db_users" value="vai_users — Préférences utilisateur,&#xa;langue préférée, is_bot_admin" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="zone_db">
+      <mxGeometry x="10" y="100" width="280" height="40" as="geometry" />
+    </mxCell>
+
+    <mxCell id="db_tickets" value="vai_tickets — Tickets (status, priority,&#xa;assigned_staff, user/staff lang, AI intent)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="zone_db">
+      <mxGeometry x="10" y="150" width="280" height="40" as="geometry" />
+    </mxCell>
+
+    <mxCell id="db_messages" value="vai_ticket_messages — Messages bilingues&#xa;(original + traduit, lang src/tgt, from_cache)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="zone_db">
+      <mxGeometry x="10" y="200" width="280" height="40" as="geometry" />
+    </mxCell>
+
+    <mxCell id="db_cache" value="vai_translations_cache — Cache SHA256&#xa;(hit_count, src_lang, tgt_lang)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="zone_db">
+      <mxGeometry x="10" y="250" width="280" height="40" as="geometry" />
+    </mxCell>
+
+    <mxCell id="db_orders" value="vai_orders — Commandes PayPal/GC/Crypto&#xa;(VAI-YYYYMM-XXXX, status, plan, amount)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="zone_db">
+      <mxGeometry x="10" y="300" width="280" height="40" as="geometry" />
+    </mxCell>
+
+    <mxCell id="db_payments" value="vai_payments — Historique paiements&#xa;(method, amount, plan, oxapay_invoice_id)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="zone_db">
+      <mxGeometry x="10" y="350" width="280" height="40" as="geometry" />
+    </mxCell>
+
+    <mxCell id="db_subs" value="vai_subscriptions — Abonnements actifs&#xa;(plan, expires_at, is_active, billing_interval)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="zone_db">
+      <mxGeometry x="10" y="400" width="280" height="40" as="geometry" />
+    </mxCell>
+
+    <mxCell id="db_kb" value="vai_knowledge_base — FAQ par serveur&#xa;(question, answer, category, is_active)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="zone_db">
+      <mxGeometry x="10" y="450" width="280" height="40" as="geometry" />
+    </mxCell>
+
+    <mxCell id="db_sessions" value="vai_dashboard_sessions — JWT sessions&#xa;(token, guild_ids_json, is_revoked, expires_at)&#xa;vai_dashboard_users — Comptes OAuth" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;" vertex="1" parent="zone_db">
+      <mxGeometry x="10" y="500" width="280" height="50" as="geometry" />
+    </mxCell>
+
+    <mxCell id="db_misc" value="vai_pending_notifications — File DMs&#xa;vai_temp_codes — OAuth temp codes (60s)&#xa;vai_bot_status — Heartbeat metrics&#xa;vai_audit_log — Actions admin tracées&#xa;vai_ticket_satisfaction — Notes 1-5★&#xa;vai_reviews — Avis clients (modérés)&#xa;vai_ticket_tags / vai_ticket_notes&#xa;vai_snippets / vai_blacklist&#xa;vai_outbound_webhooks&#xa;vai_billing_* (7 tables billing vNext)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=10;align=left;" vertex="1" parent="zone_db">
+      <mxGeometry x="10" y="560" width="280" height="130" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- ZONE: WEB DASHBOARD -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <mxCell id="zone_web" value="Web Dashboard (veridiancloud.xyz)" style="swimlane;startSize=30;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="1350" y="80" width="280" height="400" as="geometry" />
+    </mxCell>
+
+    <mxCell id="web_landing" value="index.html — Landing page&#xa;• i18n (15 langues, auto-detect)&#xa;• Pricing grid (4 plans, toggle annuel)&#xa;• Avis clients (API /internal/reviews)&#xa;• Payment methods display&#xa;• Discord bot invite" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;align=left;" vertex="1" parent="zone_web">
+      <mxGeometry x="10" y="40" width="260" height="90" as="geometry" />
+    </mxCell>
+
+    <mxCell id="web_dashboard" value="dashboard.html — Panel Admin&#xa;• Login Discord OAuth2&#xa;• Sélecteur multi-serveurs&#xa;• Pages: Dashboard / Tickets /&#xa;  Abonnement / KB / Settings / Admin&#xa;• Bot status indicator (live 60s)&#xa;• Billing builder (plan+interval+method)&#xa;• Transcript viewer + export PDF&#xa;• Settings avec toggles + preview" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;align=left;" vertex="1" parent="zone_web">
+      <mxGeometry x="10" y="145" width="260" height="130" as="geometry" />
+    </mxCell>
+
+    <mxCell id="web_ia" value="moteur-ia.html — Tableau modèles IA&#xa;• Détail modèles par feature&#xa;• Fallback cascade (4 niveaux)&#xa;• Disponibilité par plan" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=10;align=left;" vertex="1" parent="zone_web">
+      <mxGeometry x="10" y="290" width="260" height="60" as="geometry" />
+    </mxCell>
+
+    <mxCell id="web_js" value="JS: dashboard.js + i18n.js + main.js&#xa;CSS: style.css + dashboard.css" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=10;" vertex="1" parent="zone_web">
+      <mxGeometry x="10" y="365" width="260" height="25" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- ZONE: SERVICES EXTERNES -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <mxCell id="zone_ext" value="Services Externes" style="swimlane;startSize=30;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1;fontSize=11;" vertex="1" parent="1">
+      <mxGeometry x="1350" y="520" width="280" height="260" as="geometry" />
+    </mxCell>
+
+    <mxCell id="ext_groq" value="🧠 Groq API (api.groq.com)&#xa;• Llama 3.1 8B instant (rapide)&#xa;• Llama 3.3 70B versatile (qualité)&#xa;• 4 clés avec fallback automatique&#xa;• Support, traduction, résumé, priorité" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;align=left;" vertex="1" parent="zone_ext">
+      <mxGeometry x="10" y="40" width="260" height="75" as="geometry" />
+    </mxCell>
+
+    <mxCell id="ext_oxapay" value="₿ OxaPay (api.oxapay.com)&#xa;• create_invoice() → payLink&#xa;• Webhook HMAC-SHA256&#xa;• BTC, ETH, USDT, LTC et plus" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;align=left;" vertex="1" parent="zone_ext">
+      <mxGeometry x="10" y="125" width="260" height="60" as="geometry" />
+    </mxCell>
+
+    <mxCell id="ext_discord" value="Discord API (discord.com/api/v10)&#xa;• OAuth2 (identify, email, guilds)&#xa;• Bot WebSocket (events, commands)&#xa;• REST (channels, messages, roles)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=10;align=left;" vertex="1" parent="zone_ext">
+      <mxGeometry x="10" y="195" width="260" height="55" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- FLUX: TICKET FLOW -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+
+    <!-- User → Bot -->
+    <mxCell id="flow_user_bot" value="Slash commands&#xa;/ticket /close /pay&#xa;+ Messages" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.2;entryDx=0;entryDy=0;strokeColor=#6c8ebf;fontColor=#006EAF;fontStyle=1;fontSize=9;" edge="1" source="user_member" target="cog_tickets" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <mxCell id="flow_admin_bot" value="/pay admin" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#6c8ebf;fontColor=#006EAF;fontSize=9;" edge="1" source="user_admin" target="cog_payments" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- Bot → DB -->
+    <mxCell id="flow_bot_db" value="CRUD via&#xa;models.py" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#82b366;fontColor=#006600;fontSize=9;" edge="1" source="zone_bot" target="zone_db" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- Bot → Groq -->
+    <mxCell id="flow_bot_groq" value="generate_support_response()&#xa;translate() / summary()" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#9673a6;fontColor=#6900a8;fontSize=9;" edge="1" source="svc_groq" target="ext_groq" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- Bot → OxaPay (create invoice) -->
+    <mxCell id="flow_bot_oxapay" value="create_invoice()" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#6c8ebf;fontColor=#006EAF;fontSize=9;" edge="1" source="svc_oxapay" target="ext_oxapay" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- API → DB -->
+    <mxCell id="flow_api_db" value="Lecture/Écriture&#xa;via models.py" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#d6b656;fontColor=#b46504;fontSize=9;" edge="1" source="zone_api" target="zone_db" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- OxaPay Webhook → API -->
+    <mxCell id="flow_oxapay_api" value="POST /webhook/oxapay&#xa;HMAC-SHA256 verified" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#b85450;fontColor=#b85450;fontSize=9;dashed=1;" edge="1" source="ext_oxapay" target="api_webhook" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="1490" y="640" />
+          <mxPoint x="960" y="640" />
+          <mxPoint x="960" y="395" />
+        </Array>
+      </mxGeometry>
+    </mxCell>
+
+    <!-- Web → API -->
+    <mxCell id="flow_web_api" value="HTTPS REST&#xa;JWT Bearer" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#9673a6;fontColor=#6900a8;fontSize=9;" edge="1" source="zone_web" target="zone_api" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- Discord OAuth → API -->
+    <mxCell id="flow_discord_api" value="OAuth2 callback&#xa;code → JWT" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#6c8ebf;fontColor=#006EAF;fontSize=9;dashed=1;" edge="1" source="ext_discord" target="api_auth" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="1490" y="730" />
+          <mxPoint x="960" y="730" />
+          <mxPoint x="960" y="145" />
+        </Array>
+      </mxGeometry>
+    </mxCell>
+
+    <!-- Bot → API (heartbeat) -->
+    <mxCell id="flow_bot_api" value="POST /bot/heartbeat (60s)&#xa;X-API-SECRET auth" style="edgeStyle=orthogonalEdgeStyle;rounded=0;strokeColor=#d6b656;fontColor=#b46504;fontSize=9;dashed=1;" edge="1" source="bot_loops" target="api_internal" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- FLUX DÉTAILLÉ: TICKET LIFECYCLE -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <mxCell id="zone_ticket_flow" value="Flux détaillé: Cycle de vie d'un ticket" style="swimlane;startSize=25;fillColor=#f5f5f5;strokeColor=#666666;fontStyle=1;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="20" y="800" width="1620" height="160" as="geometry" />
+    </mxCell>
+
+    <mxCell id="tf1" value="1. /ticket&#xa;Utilisateur ouvre" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=9;" vertex="1" parent="zone_ticket_flow">
+      <mxGeometry x="10" y="40" width="120" height="50" as="geometry" />
+    </mxCell>
+    <mxCell id="tf2" value="2. Channel créé&#xa;+ Embed bienvenue&#xa;+ Logs channel" style="rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=9;" vertex="1" parent="zone_ticket_flow">
+      <mxGeometry x="150" y="40" width="120" height="50" as="geometry" />
+    </mxCell>
+    <mxCell id="tf3" value="3. Détection langue&#xa;+ Analyse IA (intent)&#xa;+ Smart Welcome" style="rounded=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=9;" vertex="1" parent="zone_ticket_flow">
+      <mxGeometry x="290" y="40" width="120" height="50" as="geometry" />
+    </mxCell>
+    <mxCell id="tf4" value="4. Messages traduits&#xa;bidirectionnellement&#xa;(cache SHA256)" style="rounded=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=9;" vertex="1" parent="zone_ticket_flow">
+      <mxGeometry x="430" y="40" width="120" height="50" as="geometry" />
+    </mxCell>
+    <mxCell id="tf5" value="5. Staff prend&#xa;le ticket (bouton)&#xa;Round-robin Pro" style="rounded=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=9;" vertex="1" parent="zone_ticket_flow">
+      <mxGeometry x="570" y="40" width="120" height="50" as="geometry" />
+    </mxCell>
+    <mxCell id="tf6" value="6. Priorisation IA&#xa;(low/medium/high/urgent)&#xa;SLA check 5min" style="rounded=1;fillColor=#ffe6cc;strokeColor=#d79b00;fontSize=9;" vertex="1" parent="zone_ticket_flow">
+      <mxGeometry x="710" y="40" width="120" height="50" as="geometry" />
+    </mxCell>
+    <mxCell id="tf7" value="7. /close ou bouton&#xa;→ pending_close&#xa;→ confirmation staff" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=9;" vertex="1" parent="zone_ticket_flow">
+      <mxGeometry x="850" y="40" width="120" height="50" as="geometry" />
+    </mxCell>
+    <mxCell id="tf8" value="8. Résumé IA généré&#xa;+ Transcript bilingue&#xa;+ DM utilisateur" style="rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=9;" vertex="1" parent="zone_ticket_flow">
+      <mxGeometry x="990" y="40" width="120" height="50" as="geometry" />
+    </mxCell>
+    <mxCell id="tf9" value="9. Rating satisfaction&#xa;DM 1-5★&#xa;→ vai_ticket_satisfaction" style="rounded=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=9;" vertex="1" parent="zone_ticket_flow">
+      <mxGeometry x="1130" y="40" width="120" height="50" as="geometry" />
+    </mxCell>
+    <mxCell id="tf10" value="10. Channel supprimé&#xa;automatiquement&#xa;après 10s" style="rounded=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=9;" vertex="1" parent="zone_ticket_flow">
+      <mxGeometry x="1270" y="40" width="120" height="50" as="geometry" />
+    </mxCell>
+    <mxCell id="tf11" value="11. Dashboard:&#xa;ticket fermé visible,&#xa;réouverture possible" style="rounded=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=9;" vertex="1" parent="zone_ticket_flow">
+      <mxGeometry x="1410" y="40" width="120" height="50" as="geometry" />
+    </mxCell>
+
+    <!-- Arrows between ticket flow steps -->
+    <mxCell id="tfa1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;fontSize=9;" edge="1" source="tf1" target="tf2" parent="zone_ticket_flow"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="tfa2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;fontSize=9;" edge="1" source="tf2" target="tf3" parent="zone_ticket_flow"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="tfa3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;fontSize=9;" edge="1" source="tf3" target="tf4" parent="zone_ticket_flow"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="tfa4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;fontSize=9;" edge="1" source="tf4" target="tf5" parent="zone_ticket_flow"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="tfa5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;fontSize=9;" edge="1" source="tf5" target="tf6" parent="zone_ticket_flow"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="tfa6" style="edgeStyle=orthogonalEdgeStyle;rounded=0;fontSize=9;" edge="1" source="tf6" target="tf7" parent="zone_ticket_flow"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="tfa7" style="edgeStyle=orthogonalEdgeStyle;rounded=0;fontSize=9;" edge="1" source="tf7" target="tf8" parent="zone_ticket_flow"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="tfa8" style="edgeStyle=orthogonalEdgeStyle;rounded=0;fontSize=9;" edge="1" source="tf8" target="tf9" parent="zone_ticket_flow"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="tfa9" style="edgeStyle=orthogonalEdgeStyle;rounded=0;fontSize=9;" edge="1" source="tf9" target="tf10" parent="zone_ticket_flow"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="tfa10" style="edgeStyle=orthogonalEdgeStyle;rounded=0;fontSize=9;" edge="1" source="tf10" target="tf11" parent="zone_ticket_flow"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- FLUX PAIEMENT -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <mxCell id="zone_pay_flow" value="Flux détaillé: Paiements (3 méthodes)" style="swimlane;startSize=25;fillColor=#f5f5f5;strokeColor=#666666;fontStyle=1;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="20" y="980" width="1620" height="160" as="geometry" />
+    </mxCell>
+
+    <!-- OXAPAY -->
+    <mxCell id="pf_crypto1" value="Crypto: /pay oxapay&#xa;plan → amount" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=9;" vertex="1" parent="zone_pay_flow">
+      <mxGeometry x="10" y="50" width="110" height="50" as="geometry" />
+    </mxCell>
+    <mxCell id="pf_crypto2" value="OxaPayClient&#xa;create_invoice()&#xa;→ payLink" style="rounded=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=9;" vertex="1" parent="zone_pay_flow">
+      <mxGeometry x="140" y="50" width="110" height="50" as="geometry" />
+    </mxCell>
+    <mxCell id="pf_crypto3" value="Utilisateur paie&#xa;sur page OxaPay&#xa;(BTC/ETH/USDT)" style="rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=9;" vertex="1" parent="zone_pay_flow">
+      <mxGeometry x="270" y="50" width="110" height="50" as="geometry" />
+    </mxCell>
+    <mxCell id="pf_crypto4" value="Webhook POST&#xa;/webhook/oxapay&#xa;HMAC vérifié" style="rounded=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=9;" vertex="1" parent="zone_pay_flow">
+      <mxGeometry x="400" y="50" width="110" height="50" as="geometry" />
+    </mxCell>
+    <mxCell id="pf_crypto5" value="Subscription activée&#xa;auto → DM user&#xa;+ notif owner" style="rounded=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=9;" vertex="1" parent="zone_pay_flow">
+      <mxGeometry x="530" y="50" width="110" height="50" as="geometry" />
+    </mxCell>
+    <mxCell id="pf_c1" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="pf_crypto1" target="pf_crypto2" parent="zone_pay_flow"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="pf_c2" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="pf_crypto2" target="pf_crypto3" parent="zone_pay_flow"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="pf_c3" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="pf_crypto3" target="pf_crypto4" parent="zone_pay_flow"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="pf_c4" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="pf_crypto4" target="pf_crypto5" parent="zone_pay_flow"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+    <!-- PAYPAL -->
+    <mxCell id="pf_pp1" value="PayPal: /pay paypal&#xa;→ Order ID généré" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=9;" vertex="1" parent="zone_pay_flow">
+      <mxGeometry x="680" y="50" width="110" height="50" as="geometry" />
+    </mxCell>
+    <mxCell id="pf_pp2" value="DM owner + boutons&#xa;(Payé / Rejeté /&#xa;Incomplet)" style="rounded=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=9;" vertex="1" parent="zone_pay_flow">
+      <mxGeometry x="810" y="50" width="110" height="50" as="geometry" />
+    </mxCell>
+    <mxCell id="pf_pp3" value="Owner valide via&#xa;dashboard ou bouton DM&#xa;→ /dashboard/orders/validate" style="rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=9;" vertex="1" parent="zone_pay_flow">
+      <mxGeometry x="940" y="50" width="120" height="50" as="geometry" />
+    </mxCell>
+    <mxCell id="pf_pp4" value="Subscription activée&#xa;+ DM confirmation&#xa;à l'utilisateur" style="rounded=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=9;" vertex="1" parent="zone_pay_flow">
+      <mxGeometry x="1080" y="50" width="110" height="50" as="geometry" />
+    </mxCell>
+    <mxCell id="pf_p1" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="pf_pp1" target="pf_pp2" parent="zone_pay_flow"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="pf_p2" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="pf_pp2" target="pf_pp3" parent="zone_pay_flow"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="pf_p3" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="pf_pp3" target="pf_pp4" parent="zone_pay_flow"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+    <!-- GIFTCARD -->
+    <mxCell id="pf_gc1" value="Giftcard: /pay giftcard&#xa;→ DM interactif" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=9;" vertex="1" parent="zone_pay_flow">
+      <mxGeometry x="1240" y="50" width="110" height="50" as="geometry" />
+    </mxCell>
+    <mxCell id="pf_gc2" value="User envoie code&#xa;+ image en DM&#xa;(timeout 600s)" style="rounded=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=9;" vertex="1" parent="zone_pay_flow">
+      <mxGeometry x="1370" y="50" width="110" height="50" as="geometry" />
+    </mxCell>
+    <mxCell id="pf_gc3" value="Owner valide&#xa;comme PayPal" style="rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=9;" vertex="1" parent="zone_pay_flow">
+      <mxGeometry x="1500" y="50" width="110" height="50" as="geometry" />
+    </mxCell>
+    <mxCell id="pf_g1" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="pf_gc1" target="pf_gc2" parent="zone_pay_flow"><mxGeometry relative="1" as="geometry"/></mxCell>
+    <mxCell id="pf_g2" style="edgeStyle=orthogonalEdgeStyle;" edge="1" source="pf_gc2" target="pf_gc3" parent="zone_pay_flow"><mxGeometry relative="1" as="geometry"/></mxCell>
+
+    <!-- Labels méthodes -->
+    <mxCell id="lbl_crypto" value="⚡ AUTOMATIQUE" style="text;html=1;strokeColor=none;fillColor=none;fontStyle=1;fontSize=9;fontColor=#006600;" vertex="1" parent="zone_pay_flow">
+      <mxGeometry x="10" y="110" width="110" height="20" as="geometry" />
+    </mxCell>
+    <mxCell id="lbl_pp" value="👤 SEMI-MANUEL" style="text;html=1;strokeColor=none;fillColor=none;fontStyle=1;fontSize=9;fontColor=#b46504;" vertex="1" parent="zone_pay_flow">
+      <mxGeometry x="680" y="110" width="110" height="20" as="geometry" />
+    </mxCell>
+    <mxCell id="lbl_gc" value="👤 SEMI-MANUEL" style="text;html=1;strokeColor=none;fillColor=none;fontStyle=1;fontSize=9;fontColor=#b46504;" vertex="1" parent="zone_pay_flow">
+      <mxGeometry x="1240" y="110" width="110" height="20" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- LÉGENDE -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <mxCell id="legend" value="Légende" style="swimlane;startSize=20;fillColor=#f5f5f5;strokeColor=#666666;fontStyle=1;fontSize=10;" vertex="1" parent="1">
+      <mxGeometry x="20" y="1160" width="400" height="80" as="geometry" />
+    </mxCell>
+    <mxCell id="leg1" value="Discord Bot" style="rounded=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=9;" vertex="1" parent="legend"><mxGeometry x="10" y="25" width="80" height="20" as="geometry" /></mxCell>
+    <mxCell id="leg2" value="FastAPI" style="rounded=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=9;" vertex="1" parent="legend"><mxGeometry x="100" y="25" width="80" height="20" as="geometry" /></mxCell>
+    <mxCell id="leg3" value="MySQL DB" style="rounded=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=9;" vertex="1" parent="legend"><mxGeometry x="190" y="25" width="80" height="20" as="geometry" /></mxCell>
+    <mxCell id="leg4" value="Web + Ext API" style="rounded=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=9;" vertex="1" parent="legend"><mxGeometry x="280" y="25" width="100" height="20" as="geometry" /></mxCell>
+    <mxCell id="leg5" value="Tasks/Alerts" style="rounded=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=9;" vertex="1" parent="legend"><mxGeometry x="10" y="55" width="80" height="20" as="geometry" /></mxCell>
+    <mxCell id="leg6" value="IA/NLP" style="rounded=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontSize=9;" vertex="1" parent="legend"><mxGeometry x="100" y="55" width="80" height="20" as="geometry" /></mxCell>
+
+  </root>
+</mxGraphModel>
