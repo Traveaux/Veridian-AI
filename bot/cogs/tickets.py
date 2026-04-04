@@ -1761,7 +1761,9 @@ class SatisfactionButton(discord.ui.Button):
             color=discord.Color(COLOR_SUCCESS)
         )
         style_embed(embed)
-        await interaction.response.edit_message(embed=embed, view=None)
+        # Créer une vue vide pour remplacer les boutons
+        empty_view = discord.ui.View(timeout=None)
+        await interaction.response.edit_message(embed=embed, view=empty_view)
 
 
 class SatisfactionView(discord.ui.View):
