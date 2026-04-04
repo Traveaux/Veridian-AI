@@ -371,6 +371,21 @@ def _ensure_ticket_migrations() -> None:
                 except Exception as e:
                     logger.warning(f"[db] ALTER {tickets_table}.priority enum: {e}")
 
+        # SLA breach alert tracking
+        if _column_info(tickets_table, "sla_breach_alert_sent") is None:
+            with get_db_context() as conn:
+                cursor = conn.cursor()
+                try:
+                    cursor.execute(
+                        f"ALTER TABLE {tickets_table} "
+                        f"ADD COLUMN sla_breach_alert_sent TINYINT(1) DEFAULT 0 "
+                        f"COMMENT 'Alerte SLA envoyee (1=oui)'"
+                    )
+                    logger.info(f"[db] Colonne sla_breach_alert_sent ajoutee a {tickets_table}")
+                except Exception as e:
+                    if "duplicate column" not in str(e).lower():
+                        logger.warning(f"[db] ALTER {tickets_table}.sla_breach_alert_sent: {e}")
+
     msgs_table = f"{DB_TABLE_PREFIX}ticket_messages"
     if _table_exists(msgs_table):
         if _column_info(msgs_table, "author_username") is None:
