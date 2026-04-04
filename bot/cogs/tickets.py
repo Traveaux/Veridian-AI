@@ -13,7 +13,7 @@ from datetime import datetime
 
 from bot.db.models import TicketModel, GuildModel, UserModel, TicketMessageModel, PendingActionModel, TicketSatisfactionModel
 from bot.db.connection import get_db_context
-from bot.config import DB_TABLE_PREFIX, COLOR_SUCCESS, COLOR_NOTICE, COLOR_WARNING, COLOR_CRITICAL, BOT_OWNER_DISCORD_ID
+from bot.config import DB_TABLE_PREFIX, COLOR_SUCCESS, COLOR_NOTICE, COLOR_WARNING, COLOR_CRITICAL, BOT_OWNER_DISCORD_ID, TICKET_CHANNEL_PREFIX
 from bot.services.translator import TranslatorService
 from bot.services.groq_client import GroqClient
 from bot.utils.embed_style import style_embed, translation_embed_title, send_localized_embed, strip_emojis, _normalize_lang
