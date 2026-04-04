@@ -639,7 +639,7 @@ class TicketsCog(commands.Cog):
 
         embed = discord.Embed(
             title=i18n.get("tickets.welcome_title", locale),
-            color=i18n.get("tickets.welcome_color", locale, fallback=COLOR_SUCCESS),
+            color=COLOR_SUCCESS,
             description=i18n.get("tickets.welcome_desc", locale),
         )
         embed.add_field(name=i18n.get("tickets.user_msg_field", locale), value=_truncate_block(_render_template(user_template, variables)), inline=False)
