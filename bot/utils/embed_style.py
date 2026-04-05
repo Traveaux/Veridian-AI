@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 import discord
 
-_CUSTOM_EMOJI_RE = re.compile(r"<a?:[A-Za-z0-9_]+:\d+>")
+_CUSTOM_EMOJI_RE = re.compile(r"<a?:[A-Za-z0-9_~]+:\d+>")
 _EMOJI_RE = re.compile(
     "["
     "\U0001F1E0-\U0001F1FF"
