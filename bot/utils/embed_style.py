@@ -60,6 +60,39 @@ def strip_emojis(text: str | None) -> str | None:
     return cleaned or None
 
 
+def _preserve_emojis_during_styling(text: str | None) -> str | None:
+    """Extract emojis, apply styling to text only, then reinsert emojis."""
+    if text is None:
+        return None
+    
+    # Extract emojis with their positions
+    emojis = []
+    def extract_emoji(match):
+        emojis.append((match.start(), match.end(), match.group(0)))
+        return "\x00EMOJI\x00"
+    
+    # Replace emojis with placeholder
+    text_with_placeholders = _CUSTOM_EMOJI_RE.sub(extract_emoji, text)
+    
+    # Remove standard Unicode emojis (protected emojis are now placeholders)
+    text_with_placeholders = _EMOJI_RE.sub("", text_with_placeholders)
+    # Remove variation selectors
+    text_with_placeholders = _VARIATION_RE.sub("", text_with_placeholders)
+    
+    # Apply styling cleanup (sans toucher les emojis car ils sont en placeholder)
+    text_with_placeholders = text_with_placeholders.replace("\r\n", "\n").replace("\r", "\n")
+    text_with_placeholders = _WHITESPACE_RE.sub(" ", text_with_placeholders)
+    text_with_placeholders = _MULTILINE_RE.sub("\n\n", text_with_placeholders)
+    text_with_placeholders = text_with_placeholders.strip()
+    
+    # Reinsert emojis at their original positions
+    result = text_with_placeholders
+    for _, _, emoji in reversed(emojis):  # reversed to not mess up positions
+        result = result.replace("\x00EMOJI\x00", emoji, 1)
+    
+    return result or None
+
+
 def _wrap_with_border(text: str | None) -> str:
     if not text:
         return ""
@@ -72,30 +105,30 @@ def translation_embed_title(language_code: str | None) -> str:
 
 
 def style_embed(embed: discord.Embed) -> discord.Embed:
-    """Clean embed text while preserving Discord custom emojis."""
+    """Clean embed text while preserving Discord custom emojis from styling issues."""
     from bot.config import COLOR_SUCCESS  # Use default color if not set
 
     if embed.title:
-        embed.title = strip_emojis(embed.title) or embed.title
+        embed.title = _preserve_emojis_during_styling(embed.title) or embed.title
 
     if embed.description:
-        embed.description = strip_emojis(embed.description) or embed.description
+        embed.description = _preserve_emojis_during_styling(embed.description) or embed.description
 
     if embed.author.name:
-        name = strip_emojis(embed.author.name)
+        name = _preserve_emojis_during_styling(embed.author.name)
         if name:
             embed.set_author(name=name, icon_url=embed.author.icon_url)
 
     for index, field in enumerate(list(embed.fields)):
-        name = strip_emojis(field.name) or "\u200b"
-        value = strip_emojis(field.value) or "-"
+        name = _preserve_emojis_during_styling(field.name) or "\u200b"
+        value = _preserve_emojis_during_styling(field.value) or "-"
         embed.set_field_at(index, name=name, value=value, inline=field.inline)
 
     if not embed.color:
         embed.color = discord.Color(COLOR_SUCCESS)
 
     if embed.footer.text:
-        footer_text = strip_emojis(embed.footer.text)
+        footer_text = _preserve_emojis_during_styling(embed.footer.text)
         if footer_text:
             embed.set_footer(text=footer_text, icon_url=embed.footer.icon_url)
         else:
