@@ -644,15 +644,15 @@ class TicketsCog(commands.Cog):
         )
         embed.add_field(name=i18n.get("tickets.user_msg_field", locale), value=_truncate_block(_render_template(user_template, variables)), inline=False)
         embed.add_field(name=i18n.get("tickets.staff_note_field", locale), value=_truncate_block(_render_template(staff_template, variables)), inline=False)
-        embed.add_field(name=i18n.get("tickets.ticket_id", locale), value=f"`{ticket_id}`", inline=True)
-        embed.add_field(name=i18n.get("tickets.user_lang", locale), value=f"`{ul}`", inline=True)
-        embed.add_field(name=i18n.get("tickets.staff_lang", locale), value=f"`{sl}`", inline=True)
-        embed.add_field(name=i18n.get("tickets.status", locale), value=f"`{status_text}`", inline=True)
-        embed.add_field(name=i18n.get("tickets.assigned_to", locale), value=f"`{assigned_label}`", inline=True)
+        embed.add_field(name=i18n.get("tickets.ticket_id", locale), value=str(ticket_id), inline=True)
+        embed.add_field(name=i18n.get("tickets.user_lang", locale), value=ul, inline=True)
+        embed.add_field(name=i18n.get("tickets.staff_lang", locale), value=sl, inline=True)
+        embed.add_field(name=i18n.get("tickets.status", locale), value=status_text, inline=True)
+        embed.add_field(name=i18n.get("tickets.assigned_to", locale), value=assigned_label, inline=True)
         
         pr_raw = (priority or "medium").strip().lower()
         pr_label = i18n.get(f"tickets.priority_{pr_raw}", locale)
-        embed.add_field(name=i18n.get("tickets.priority", locale), value=f"`{pr_label}`", inline=True)
+        embed.add_field(name=i18n.get("tickets.priority", locale), value=pr_label, inline=True)
 
         intent = (cfg.get("last_analysis") or "").strip()
         if intent:
@@ -752,13 +752,13 @@ class TicketsCog(commands.Cog):
                 description=transcript_staff or i18n.get("tickets.summary_none", locale),
                 color=discord.Color(COLOR_NOTICE),
             )
-            base_embed.add_field(name=i18n.get("tickets.priority", locale), value=f"`{pr_label}`", inline=True)
+            base_embed.add_field(name=i18n.get("tickets.priority", locale), value=pr_label, inline=True)
             base_embed.add_field(
                 name="Langues",
                 value=f"User: `{user_lang or 'auto'}` · Staff: `{staff_lang or 'auto'}`",
                 inline=True,
             )
-            base_embed.add_field(name=i18n.get("tickets.assigned_to", locale), value=f"`{assigned_label}`", inline=True)
+            base_embed.add_field(name=i18n.get("tickets.assigned_to", locale), value=assigned_label, inline=True)
             await channel.send(embed=style_embed(base_embed))
 
             if transcript_user and user_lang and user_lang != staff_lang:
@@ -790,10 +790,10 @@ class TicketsCog(commands.Cog):
                         description=transcript_user or transcript_staff or "Aucun résumé disponible.",
                         color=discord.Color(COLOR_SUCCESS),
                     )
-                    user_embed.add_field(name="Assigné à", value=f"`{assigned_label}`", inline=True)
+                    user_embed.add_field(name="Assigné à", value=assigned_label, inline=False)
                     user_embed.add_field(
                         name="Fichier téléchargeable",
-                        value=f"`{user_file.filename}`",
+                        value=f"{user_file.filename}",
                         inline=False,
                     )
                     if metrics.get("avg_response"):
@@ -819,7 +819,7 @@ class TicketsCog(commands.Cog):
                         ),
                         color=discord.Color(COLOR_NOTICE),
                     )
-                    meta.add_field(name="Priorité", value=f"`{pr_label}`", inline=True)
+                    meta.add_field(name="Priorité", value=pr_label, inline=True)
                     meta.add_field(name="Temps de réponse moyen", value=f"`{metrics.get('avg_response') or 'N/A'}`", inline=True)
                     meta.add_field(name="Durée totale", value=f"`{metrics.get('open_duration') or 'N/A'}`", inline=True)
                     if ticket.get("opened_at"):
